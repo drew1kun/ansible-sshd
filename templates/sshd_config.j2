@@ -21,16 +21,16 @@ LogLevel ERROR 			# If disk spase is not concern, use 'LogLevel INFO'
 
 #================================== AUTHENTICATION =============================
 # Whitelist allowed users
-AllowUsers {% for user in sshd_users %}{{ user.username }} {% endfor %}
+AllowUsers{% for user in sshd_users %}{% if user.username != 'root' %} {{ user.username }}{% endif %}{% endfor %}
 
 LoginGraceTime 60 		# time in seconds to enter passphrase.
 				# The less - the less DDoS vector
 {% if sshd_disable_root %}
 PermitRootLogin no  		# No root login
-{% elseif not sshd_disable_root is defined %}
-PermitRootLogin yes			# Allow root login
-{% else %}
+{% elif sshd_disable_root == 'nopass' %}
 PermitRootLogin prohibit-password # Use root login only with pub key authentication
+{% else %}
+PermitRootLogin yes			# Allow root login
 {% endif %}
 
 StrictModes yes 		# Force permissions checks on keyfiles and directories

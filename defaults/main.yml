@@ -10,7 +10,7 @@ sshd_port: 22
 # Solution: set 'MaxSessions 4' (or higher)in sshd_config before provisioning
 #
 sshd_users:
-  - username: {{ ansible_user_id }}
+  - username: "{{ ansible_user_id }}"
     key: "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"
     comment: 'drewshg@gmail.com'
 
@@ -18,7 +18,7 @@ sshd_users:
     key: "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"
     comment:
 
-sshd_disable_root:
+sshd_disable_root: yes  # If no specified, then only passwordless root login will be configured
 
 sshd_from_homebrew: no
 ...
