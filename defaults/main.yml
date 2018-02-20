@@ -18,7 +18,8 @@ sshd_users:
     key: "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"
     comment:
 
-sshd_root_login: yes  # yes | no; If yes, then only passwordless root login (pubkey) will be configured
+sshd_root_login: no   # yes | no; No - recommended
+                      # If yes, then only passwordless root login (pubkey) will be configured
 
 sshd_from_homebrew: no
 ...

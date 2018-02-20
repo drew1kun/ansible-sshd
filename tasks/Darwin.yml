@@ -6,7 +6,7 @@
   tags:
     - sshd
 
-- name: "[Darwin] Include tasks from hombrew.yml only if configuring sshd from homebrew (overwrites some vars from Darwin.yml)"
+- name: "[Darwin] Include tasks from homebrew.yml only if configuring sshd from homebrew (overwrites some vars from Darwin.yml)"
   include_tasks: homebrew.yml
   when: sshd_from_homebrew
   tags:
