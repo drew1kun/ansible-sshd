@@ -29,7 +29,7 @@ AllowUsers{% for user in sshd_users %}{% if user.username != 'root' %} {{ user.u
 
 LoginGraceTime 60 		# time in seconds to enter passphrase.
 				# The less - the less DDoS vector
-{% if sshd_root_login is defined and false %}
+{% if not sshd_root_login %}
 PermitRootLogin no  		# No root login
 {% else %}
 PermitRootLogin prohibit-password # Use root login only with pub key authentication
