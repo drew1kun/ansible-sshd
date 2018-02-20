@@ -1,0 +1,115 @@
+#===============================================================================
+{% if sshd_port is defined %}
+Port {{ sshd_port }}
+{% else %}
+#Port 22
+{% endif %}
+
+AddressFamily inet		# Restrict to IPv4. inet = IPv4, inet6 = IPv6, any = both
+ListenAddress 0.0.0.0 	# Listen only on the internal network address
+Protocol 2 			# Only use protocol version 2
+
+# HostKeys for protocol version 2:
+HostKey {% if ansible_os_family == 'Darwin' and sshd_from_homebrew %}/usr/local{% endif %}/etc/ssh/ssh_host_rsa_key
+HostKey {% if ansible_os_family == 'Darwin' and sshd_from_homebrew %}/usr/local{% endif %}/etc/ssh/ssh_host_dsa_key
+HostKey {% if ansible_os_family == 'Darwin' and sshd_from_homebrew %}/usr/local{% endif %}/etc/ssh/ssh_host_ecdsa_key
+HostKey {% if ansible_os_family == 'Darwin' and sshd_from_homebrew %}/usr/local{% endif %}/etc/ssh/ssh_host_ed25519_key
+
+#=================================== LOGGING ===================================
+SyslogFacility AUTHPRIV 	# obsoletes QuietMode and FascistLogging
+LogLevel ERROR 			# If disk spase is not concern, use 'LogLevel INFO'
+
+#================================== AUTHENTICATION =============================
+# Whitelist allowed users
+AllowUsers {% for user in sshd_users %}{{ user.username }} {% endfor %}
+
+LoginGraceTime 60 		# time in seconds to enter passphrase.
+				# The less - the less DDoS vector
+{% if sshd_disable_root %}
+PermitRootLogin no  		# No root login
+{% elseif not sshd_disable_root is defined %}
+PermitRootLogin yes			# Allow root login
+{% else %}
+PermitRootLogin prohibit-password # Use root login only with pub key authentication
+{% endif %}
+
+StrictModes yes 		# Force permissions checks on keyfiles and directories
+MaxAuthTries 2			# By default - up to 6 tries
+MaxSessions 4			# Must be 4 or more in order to provision multiple users with ansible
+
+PubkeyAuthentication yes 	# Use public key authentication:
+AuthorizedKeysFile      %h/.ssh/authorized_keys  # %h - home directory (may be omitted)
+
+#AuthorizedPrincipalsFile none
+
+#AuthorizedKeysCommand none
+#AuthorizedKeysCommandUser nobody
+
+HostbasedAuthentication no   	# For this to work host keys in /etc/ssh/ssh_known_hosts needed
+IgnoreUserKnownHosts yes 	# Don't trust ~/.ssh/known_hosts for RhostsRSAAuthentication
+IgnoreRhosts yes 		# Don't read the user's ~/.rhosts and ~/.shosts files
+
+PasswordAuthentication no 	# Disable the use of passwords completly, only use public/private keys
+PermitEmptyPasswords no
+
+ChallengeResponseAuthentication no	# Disable s/key passwords. Unessisary when using keys
+
+# Kerberos options
+#KerberosAuthentication no
+#KerberosOrLocalPasswd yes
+#KerberosTicketCleanup yes
+#KerberosGetAFSToken no
+
+# GSSAPI options
+#GSSAPIAuthentication no
+#GSSAPICleanupCredentials yes
+
+# Set this to 'yes' to enable PAM authentication, account processing,
+# and session processing. If this is enabled, PAM authentication will
+# be allowed through the ChallengeResponseAuthentication and
+# PasswordAuthentication.  Depending on your PAM configuration,
+# PAM authentication via ChallengeResponseAuthentication may bypass
+# the setting of "PermitRootLogin without-password".
+# If you just want the PAM account and session checks to run without
+# PAM authentication, then enable this but set PasswordAuthentication
+# and ChallengeResponseAuthentication to 'no'.
+UsePAM yes 		# Also allows SSHD to be run as a non-root user
+
+#AllowAgentForwarding yes
+#AllowTcpForwarding yes
+#GatewayPorts no
+X11Forwarding no 	# Disable XForwarding unless you need it:
+#X11DisplayOffset 10
+#X11UseLocalhost yes
+#PermitTTY yes
+#PrintMotd yes
+PrintLastLog yes	# Print the last time the user logged in
+TCPKeepAlive no 	# Prevent zombies. Use ClientAliveInterval instead to prevent TCP Spoofing attacks
+#UseLogin no 		# DEPRECATED
+#Compression delayed
+ClientAliveInterval 600	# Disconnect ssh when no activity
+ClientAliveCountMax 0 	# Total number of checkalive messages from server with no response
+#UseDNS no
+#PidFile /var/run/sshd.pid
+MaxStartups 10:30:60	# 10 - Number of unauthenticated connections before start dropping
+			# 30 - % chance of dropping once we reach 10 unauth connections
+			# 60 - Maximum number of connections at which we start dropping
+PermitTunnel no
+#VersionAddendum none
+
+# Allow client to pass locale environment variables
+AcceptEnv LANG LC_*
+
+# Display login banner (before authentication):
+Banner {{ sshd_cfg_dir }}/issue.net
+Subsystem sftp {{ sshd_sftp_server }}
+#Subsystem sftp internal-sftp -f DAEMON -u 000  # for Synology
+ChrootDirectory /
+
+# Allow SSH Tunnelling for specific users:
+{% for user in sshd_users %}
+Match User  {{ user.username }}
+     AllowTcpForwarding yes
+     X11Forwarding yes
+
+{% endfor %}

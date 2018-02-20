@@ -1,0 +1,24 @@
+---
+# defaults file for sshd
+
+sshd_port: 22
+
+# NOTE: in order to manage multiple users, the sshd on the managed host must allow enough sessions.
+# Paramiko module spits out the Warning and Error.
+# Warning: No handlers could be found for logger "paramiko.transport"
+# Error: 'Failed to open session'
+# Solution: set 'MaxSessions 4' (or higher)in sshd_config before provisioning
+#
+sshd_users:
+  - username: {{ ansible_user_id }}
+    key: "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"
+    comment: 'drewshg@gmail.com'
+
+  - username: root
+    key: "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"
+    comment:
+
+sshd_disable_root:
+
+sshd_from_homebrew: no
+...
