@@ -47,7 +47,8 @@ defaults/main.yml:
       - username: root
         key:  "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"
 
-    sshd_disable_root: yes | no         # disable ssh root login. Yes - recommended
+    sshd_root_login: yes | no           # Allow ssh root login? No - recommended
+                                        # If yes - then only passwordless (pubkey) root login will be configured
 
 MacOS-Specific:
 
