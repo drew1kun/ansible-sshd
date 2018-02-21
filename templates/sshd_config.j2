@@ -36,7 +36,7 @@ PermitRootLogin no  		# No root login
 {% endif %}
 
 StrictModes yes 		# Force permissions checks on keyfiles and directories
-MaxAuthTries 2			# By default - up to 6 tries
+MaxAuthTries 2			# 6 is default
 MaxSessions 4			# Must be 4 or more in order to provision multiple users with ansible
 
 PubkeyAuthentication yes 	# Use public key authentication:
@@ -84,7 +84,7 @@ X11Forwarding no 	# Disable XForwarding unless you need it:
 #X11DisplayOffset 10
 #X11UseLocalhost yes
 #PermitTTY yes
-#PrintMotd yes
+PrintMotd yes
 PrintLastLog yes	# Print the last time the user logged in
 TCPKeepAlive no 	# Prevent zombies. Use ClientAliveInterval instead to prevent TCP Spoofing attacks
 #UseLogin no 		# DEPRECATED
