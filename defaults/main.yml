@@ -14,7 +14,7 @@ sshd_users:
     key: "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"
     comment: 'drewshg@gmail.com'
 
-  - username: root
+  - username: drew
     key: "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"
     comment:
 
