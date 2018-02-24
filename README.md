@@ -26,7 +26,9 @@ And include it in the playbook:
     roles:
         - drew-kun.homebrew
 
-NOTE: in order to manage multiple users, the sshd on the managed host must allow enough sessions.
+NOTE1: As ssh is essential service for ansible, this role must be included in the playbook at the end position. No other roles should follow after otherwise the playbook will fail.
+
+NOTE2: in order to manage multiple users, the sshd on the managed host must allow enough sessions.
 Paramiko module spits out the Warning and Error.
 Warning: No handlers could be found for logger "paramiko.transport"
 Error: 'Failed to open session'
