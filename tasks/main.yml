@@ -57,7 +57,7 @@
     key: "{{ item.key }}"
     comment: "{{ item.comment }}"
   become: yes   # this module required for this module; 'become_user: item' won't work
-  with_items: "{{ sshd_users | unique }}"
+  with_items: "{{ sshd_users | unique | list }}"
   notify: Restart sshd
   tags:
     - sshd
