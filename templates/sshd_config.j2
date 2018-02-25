@@ -108,10 +108,19 @@ Subsystem sftp {{ sshd_sftp_server }}
 #Subsystem sftp internal-sftp -f DAEMON -u 000  # for Synology
 ChrootDirectory /
 
-# Allow SSH Tunnelling for specific users:
+# User-Specific configuration (allow SSH Tunnelling, etc.):
 {% for user in sshd_users %}
+	{% if sshd_root_login == true %}
 Match User  {{ user.username }}
      AllowTcpForwarding yes
      X11Forwarding yes
 
+	{% else %}
+		{% if user.username != 'root' %}
+Match User  {{ user.username }}
+     AllowTcpForwarding yes
+     X11Forwarding yes
+
+		{% endif %}
+	{% endif %}
 {% endfor %}
