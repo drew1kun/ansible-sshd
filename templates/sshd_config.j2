@@ -57,14 +57,14 @@ PermitEmptyPasswords no
 ChallengeResponseAuthentication no	# Disable s/key passwords. Unessisary when using keys
 
 # Kerberos options
-#KerberosAuthentication no
-#KerberosOrLocalPasswd yes
-#KerberosTicketCleanup yes
+KerberosAuthentication yes
+KerberosOrLocalPasswd yes
+KerberosTicketCleanup yes
 #KerberosGetAFSToken no
 
 # GSSAPI options
-#GSSAPIAuthentication no
-#GSSAPICleanupCredentials yes
+GSSAPIAuthentication yes
+GSSAPICleanupCredentials yes
 
 # Set this to 'yes' to enable PAM authentication, account processing,
 # and session processing. If this is enabled, PAM authentication will
