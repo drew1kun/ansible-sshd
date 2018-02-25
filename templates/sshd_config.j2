@@ -22,9 +22,9 @@ LogLevel ERROR 			# If disk spase is not concern, use 'LogLevel INFO'
 #================================== AUTHENTICATION =============================
 # Whitelist allowed users
 {% if sshd_root_login == true %}
-AllowUsers{% for user in sshd_users %} {{ user.username }}{% endfor %}
+AllowUsers{% for user in sshd_users|map(attribute='username')|unique|list %} {{user}}{%endfor%}
 {% else %}
-AllowUsers{% for user in sshd_users %}{% if user.username != 'root' %} {{ user.username }}{% endif %}{% endfor %}
+AllowUsers{% for user in sshd_users|map(attribute='username')|unique|list %}{%if user!='root'%} {{user}}{%endif%}{%endfor%}
 {% endif %}
 
 LoginGraceTime 60 		# time in seconds to enter passphrase.
@@ -109,18 +109,18 @@ Subsystem sftp {{ sshd_sftp_server }}
 ChrootDirectory /
 
 # User-Specific configuration (allow SSH Tunnelling, etc.):
-{% for user in (sshd_users | unique) %}
-	{% if sshd_root_login == true %}
-Match User  {{ user.username }}
+{% for user in sshd_users|map(attribute='username')|unique|list %}
+{% if sshd_root_login == true %}
+Match User  {{ user }}
      AllowTcpForwarding yes
      X11Forwarding yes
 
-	{% else %}
-		{% if user.username != 'root' %}
-Match User  {{ user.username }}
+{% else %}
+{% if user != 'root' %}
+Match User  {{ user }}
      AllowTcpForwarding yes
      X11Forwarding yes
 
-		{% endif %}
-	{% endif %}
+{% endif %}
+{% endif %}
 {% endfor %}
