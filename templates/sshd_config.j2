@@ -109,7 +109,7 @@ Subsystem sftp {{ sshd_sftp_server }}
 ChrootDirectory /
 
 # User-Specific configuration (allow SSH Tunnelling, etc.):
-{% for user in sshd_users %}
+{% for user in (sshd_users | unique) %}
 	{% if sshd_root_login == true %}
 Match User  {{ user.username }}
      AllowTcpForwarding yes
