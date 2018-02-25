@@ -12,7 +12,7 @@ sshd_port: 22
 sshd_users:
   - username: "{{ ansible_user_id }}"
     key: "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"
-    comment: 'drewshg@gmail.com'
+    comment:
 
   - username: drew
     key: "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"
