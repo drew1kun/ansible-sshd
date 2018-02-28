@@ -41,36 +41,31 @@ defaults/main.yml:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| **sshd_port** | port ssh daemon to listen on | 22 |
-| sshd_users<br><p style="margin-left: 40px">- username:</p><br><p style="margin-left: 40px">key:</p><br><p style="margin-left: 40px">comment</p>| list of users to configure ssh keys for and allow in etc/sshd_config | see *defaults/main.yml* |
-
-
-      - username: {{ ansible_user_id }} # username
-        key:  "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"  # put public keys named properly or each user to files/pub-keys
-        comment:                        # can be left blank or specify the email for example...
-
-    sshd_root_login: yes | no           # Allow ssh root login? No - recommended
-                                        # If yes - then only passwordless (pubkey) root login will be configured
+| **sshd_port** | port ssh daemon to listen on | `22` |
+| **sshd_users** | list of users to configure ssh keys for and allow in etc/sshd_config | see *defaults/main.yml* |
+| **sshd_root_login** | Allow ssh root login? No - recommended. If yes - then only passwordless (pubkey) root login will be configured | `no` |
 
 MacOS-Specific:
 
-    sshd_from_homebrew: yes | no        # Configure openssh daemon from homebrew instead of using the system's native?
-                                        # was useful for older versions oh MacOSX. High Sierra includes the latest openssh
-                                        # at the moment of publishing this role, so not necessary to use homebrew.
+| Variable | Description | Default |
+|----------|-------------|---------|
+| **sshd_from_homebrew** | Configure openssh daemon from homebrew instead of using the system's native? was useful for older versions oh MacOSX. High Sierra includes the latest openssh. At the moment of publishing this role, so not necessary to use homebrew. | `no` |
 
 vars/*
 
 Distribution-Specific:
 
-    sshd_bin_path:                      # Path to sshd system binary
-    sshd_cfg_dir:                       # sshd configuration file path (different for Homebrew)
-    sshd_cfg_user:                      # owner of sshd configuration files
-    sshd_cfg_group:                     # group of sshd configuration files
-    sshd_sftp_server:                   # path to sftp-server
+| Variable | Description | Default |
+|----------|-------------|---------|
+| **sshd_bin_path** | Path to sshd system binary | <ul><li>homebrew.yml: `/usr/local/sbin/sshd`</li><li>Linux,BSD (main.yml): `/usr/sbin/sshd`</li></ul> |
+| **sshd_cfg_dir** | sshd configuration file path (different for Homebrew) | <ul><li>homebrew.yml: `/usr/local/etc/ssh`</li><li>Linux,BSD (main.yml): `/etc/ssh`</li></ul> |
+| **sshd_cfg_user** | owner of sshd configuration files | <ul><li>homebrew.yml: `"{{ ansible_user_id }}"`</li><li>Linux,BSD (main.yml): `root`</li></ul> |
+| **sshd_cfg_group** | group of sshd configuration files | <ul><li>Darwin.yml: `wheel`</li><li>homebrew.yml: `admin`</li><li>Linux,BSD (main.yml): `root`</li></ul> |
+| **sshd_sftp_server** | path to sftp-server | <ul><li>Darwin: `/usr/libexec/sftp-server`</li><li>homebrew.yml: ``</li><li>Linux,BSD (main.yml): `/usr/lib/openssh/sftp-server`</li></ul> |
 
 MacOS-Specific:
 
-    sshd_wrapper_path:                  # Path to system's sshd-keygen-wrapper to be set in ssh.plist
+| **sshd_wrapper_path** | Path to system's sshd-keygen-wrapper to be set in ssh.plist | <ul><li>Darwin.yml: `/usr/libexec/sshd-keygen-wrapper`</li><li>homebrew.yml: `/usr/local/sbin/sshd`</li></ul> |
 
 Dependencies
 ------------
