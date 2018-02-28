@@ -39,15 +39,15 @@ Role Variables
 
 defaults/main.yml:
 
-    sshd_port: 22                       # port ssh daemon to listen on
+| Variable | Description | Default |
+|----------|-------------|---------|
+| **sshd_port** | port ssh daemon to listen on | 22 |
+| sshd_users<br>  - username:<br>    key:<br>    comment| list of users to configure ssh keys for and allow in etc/sshd_config | see *defaults/main.yml* |
 
 
-    sshd_users:                         # list of users to configure ssh keys for and allow in etc/sshd_config
       - username: {{ ansible_user_id }} # username
         key:  "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"  # put public keys named properly or each user to files/pub-keys
         comment:                        # can be left blank or specify the email for example...
-      - username: root
-        key:  "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"
 
     sshd_root_login: yes | no           # Allow ssh root login? No - recommended
                                         # If yes - then only passwordless (pubkey) root login will be configured
