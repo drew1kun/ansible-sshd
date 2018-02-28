@@ -61,10 +61,12 @@ Distribution-Specific:
 | **sshd_cfg_dir** | sshd configuration file path (different for Homebrew) | <ul><li>homebrew.yml: `/usr/local/etc/ssh`</li><li>Linux,BSD (main.yml): `/etc/ssh`</li></ul> |
 | **sshd_cfg_user** | owner of sshd configuration files | <ul><li>homebrew.yml: `"{{ ansible_user_id }}"`</li><li>Linux,BSD (main.yml): `root`</li></ul> |
 | **sshd_cfg_group** | group of sshd configuration files | <ul><li>Darwin.yml: `wheel`</li><li>homebrew.yml: `admin`</li><li>Linux,BSD (main.yml): `root`</li></ul> |
-| **sshd_sftp_server** | path to sftp-server | <ul><li>Darwin: `/usr/libexec/sftp-server`</li><li>homebrew.yml: ``</li><li>Linux,BSD (main.yml): `/usr/lib/openssh/sftp-server`</li></ul> |
+| **sshd_sftp_server** | path to sftp-server | <ul><li>Darwin.yml: `/usr/libexec/sftp-server`</li><li>homebrew.yml: ``</li><li>Linux,BSD (main.yml): `/usr/lib/openssh/sftp-server`</li></ul> |
 
 MacOS-Specific:
 
+| Variable | Description | Default |
+|----------|-------------|---------|
 | **sshd_wrapper_path** | Path to system's sshd-keygen-wrapper to be set in ssh.plist | <ul><li>Darwin.yml: `/usr/libexec/sshd-keygen-wrapper`</li><li>homebrew.yml: `/usr/local/sbin/sshd`</li></ul> |
 
 Dependencies
