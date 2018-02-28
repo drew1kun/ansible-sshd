@@ -37,7 +37,7 @@ Solution: set 'MaxSessions 4' (or higher)in sshd_config before provisioning
 Role Variables
 --------------
 
-defaults/main.yml:
+**defaults/main.yml:**
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -51,7 +51,7 @@ MacOS-Specific:
 |----------|-------------|---------|
 | **sshd_from_homebrew** | Configure openssh daemon from homebrew instead of using the system's native? was useful for older versions oh MacOSX. High Sierra includes the latest openssh. At the moment of publishing this role, so not necessary to use homebrew. | `no` |
 
-vars/*
+**vars/*:**
 
 Distribution-Specific:
 
@@ -61,7 +61,7 @@ Distribution-Specific:
 | **sshd_cfg_dir** | sshd configuration file path (different for Homebrew) | <ul><li>homebrew.yml: `/usr/local/etc/ssh`</li><li>Linux,BSD (main.yml): `/etc/ssh`</li></ul> |
 | **sshd_cfg_user** | owner of sshd configuration files | <ul><li>homebrew.yml: `"{{ ansible_user_id }}"`</li><li>Linux,BSD (main.yml): `root`</li></ul> |
 | **sshd_cfg_group** | group of sshd configuration files | <ul><li>Darwin.yml: `wheel`</li><li>homebrew.yml: `admin`</li><li>Linux,BSD (main.yml): `root`</li></ul> |
-| **sshd_sftp_server** | path to sftp-server | <ul><li>Darwin.yml: `/usr/libexec/sftp-server`</li><li>homebrew.yml: ``</li><li>Linux,BSD (main.yml): `/usr/lib/openssh/sftp-server`</li></ul> |
+| **sshd_sftp_server** | path to sftp-server | <ul><li>Darwin.yml: `/usr/libexec/sftp-server`</li><li>Linux,BSD (main.yml): `/usr/lib/openssh/sftp-server`</li></ul> |
 
 MacOS-Specific:
 
