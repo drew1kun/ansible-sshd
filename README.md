@@ -42,7 +42,7 @@ Role Variables
 | Variable | Description | Default |
 |----------|-------------|---------|
 | **sshd_port** | port ssh daemon to listen on | `22` |
-| **sshd_users** | list of users to configure ssh keys for and allow in etc/sshd_config | see *defaults/main.yml* |
+| **sshd_users** | list of users to configure ssh keys for and allow in etc/sshd_config | see [`defaults/main.yml`](defaults/main.yml) |
 | **sshd_root_login** | Allow ssh root login? No - recommended. If yes - then only passwordless (pubkey) root login will be configured | `no` |
 
 MacOS-Specific:
