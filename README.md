@@ -41,8 +41,8 @@ Role Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| **sshd_port** | port ssh daemon to listen on | `22` |
-| **sshd_users** | list of users to configure ssh keys for and allow in etc/sshd_config | see [`defaults/main.yml`](defaults/main.yml) |
+| **sshd_port** | Port ssh daemon to listen on | `22` |
+| **sshd_users[]** | List of users to configure ssh keys for and allow in etc/sshd_config | see [`defaults/main.yml`](defaults/main.yml) |
 | **sshd_root_login** | Allow ssh root login? No - recommended. If yes - then only passwordless (pubkey) root login will be configured | `no` |
 
 MacOS-Specific:
@@ -59,9 +59,9 @@ Distribution-Specific:
 |----------|-------------|---------|
 | **sshd_bin_path** | Path to sshd system binary | <ul><li>homebrew.yml: `/usr/local/sbin/sshd`</li><li>Linux,BSD (main.yml): `/usr/sbin/sshd`</li></ul> |
 | **sshd_cfg_dir** | sshd configuration file path (different for Homebrew) | <ul><li>homebrew.yml: `/usr/local/etc/ssh`</li><li>Linux,BSD (main.yml): `/etc/ssh`</li></ul> |
-| **sshd_cfg_user** | owner of sshd configuration files | <ul><li>homebrew.yml: `"{{ ansible_user_id }}"`</li><li>Linux,BSD (main.yml): `root`</li></ul> |
-| **sshd_cfg_group** | group of sshd configuration files | <ul><li>Darwin.yml: `wheel`</li><li>homebrew.yml: `admin`</li><li>Linux,BSD (main.yml): `root`</li></ul> |
-| **sshd_sftp_server** | path to sftp-server | <ul><li>Darwin.yml: `/usr/libexec/sftp-server`</li><li>Linux,BSD (main.yml): `/usr/lib/openssh/sftp-server`</li></ul> |
+| **sshd_cfg_user** | Owner of sshd configuration files | <ul><li>homebrew.yml: `"{{ ansible_user_id }}"`</li><li>Linux,BSD (main.yml): `root`</li></ul> |
+| **sshd_cfg_group** | Group of sshd configuration files | <ul><li>Darwin.yml: `wheel`</li><li>homebrew.yml: `admin`</li><li>Linux,BSD (main.yml): `root`</li></ul> |
+| **sshd_sftp_server** | Path to sftp-server | <ul><li>Darwin.yml: `/usr/libexec/sftp-server`</li><li>Linux,BSD (main.yml): `/usr/lib/openssh/sftp-server`</li></ul> |
 
 MacOS-Specific:
 
