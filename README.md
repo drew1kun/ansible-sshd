@@ -42,7 +42,7 @@ defaults/main.yml:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | **sshd_port** | port ssh daemon to listen on | 22 |
-| sshd_users<br>  - username:<br>    key:<br>    comment| list of users to configure ssh keys for and allow in etc/sshd_config | see *defaults/main.yml* |
+| sshd_users<br><p style="margin-left: 40px">- username:</p><br><p style="margin-left: 40px">key:</p><br><p style="margin-left: 40px">comment</p>| list of users to configure ssh keys for and allow in etc/sshd_config | see *defaults/main.yml* |
 
 
       - username: {{ ansible_user_id }} # username
