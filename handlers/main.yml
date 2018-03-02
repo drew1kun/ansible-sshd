@@ -3,7 +3,7 @@
 
 # Linux (SysV, systemd), FreeBSD (BSD init)
 - name: Restart sshd service
-  service: name=ssh state=restarted
+  service: name=sshd state=restarted
   listen: Restart sshd
   become: yes
   when: ansible_os_family != 'Darwin'

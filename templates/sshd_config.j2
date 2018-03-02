@@ -84,7 +84,7 @@ X11Forwarding no 	# Disable XForwarding unless you need it:
 #X11DisplayOffset 10
 #X11UseLocalhost yes
 #PermitTTY yes
-PrintMotd yes
+PrintMotd no	# because we are using PAM instead (look at /etc/pam.d/sshd)
 PrintLastLog yes	# Print the last time the user logged in
 TCPKeepAlive no 	# Prevent zombies. Use ClientAliveInterval instead to prevent TCP Spoofing attacks
 #UseLogin no 		# DEPRECATED

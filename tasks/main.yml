@@ -19,6 +19,16 @@
   tags:
     - sshd
 
+- name: '[main] Modify /etc/pam.d/sshd to show motd on login'
+  lineinfile:
+    path: /etc/pam.d/sshd
+    regexp: 'session\s*optional\s*pam_motd.so\s*noupdate'
+    line: 'session    optional     pam_motd.so noupdate'
+    state: present
+  become: yes
+  tags:
+    - sshd
+
 - name: "[main] Copy {{ sshd_cfg_dir }}/issue.net ssh banner"
   copy:
     src: issue.net
