@@ -11,6 +11,7 @@ Requirements
 
 One of the following OS (or deriviatives):
  - Debian | Ubuntu
+ - CentOS
  - MacOS
 
 
