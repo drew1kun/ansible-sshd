@@ -11,7 +11,7 @@
   include_vars: Darwin_pre_10.12.yml
   when:
     - not ansible_distribution_version.startswith('10.12')
-    - sshd_from_homebrew
+    - not sshd_from_homebrew
   tags:
     - sshd
 
