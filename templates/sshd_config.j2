@@ -84,7 +84,11 @@ X11Forwarding no 	# Disable XForwarding unless you need it:
 #X11DisplayOffset 10
 #X11UseLocalhost yes
 #PermitTTY yes
-PrintMotd no	# because we are using PAM instead (look at /etc/pam.d/sshd)
+{% if ansible_os_family == 'Darwing' %}
+PrintMotd yes	# MacOS' /etc/pam.d/sshd does not support pam_motd.so option
+{% else %}
+PrintMotd no	# On Linux we are using PAM instead (look at /etc/pam.d/sshd)
+{% endif %}
 PrintLastLog yes	# Print the last time the user logged in
 TCPKeepAlive no 	# Prevent zombies. Use ClientAliveInterval instead to prevent TCP Spoofing attacks
 #UseLogin no 		# DEPRECATED
