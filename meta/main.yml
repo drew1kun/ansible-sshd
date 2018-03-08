@@ -14,7 +14,7 @@ galaxy_info:
       - all
     - name: MacOSX
       versions:
-      - all
+      - 10.13
 
   galaxy_tags:
     - ssh
