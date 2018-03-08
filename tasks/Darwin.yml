@@ -1,8 +1,17 @@
 ---
-#- name: "[Darwin] Include vars from Darwin.yml only if configuring system sshd (not from homebrew)"
 - name: "[Darwin] Include vars from Darwin.yml"
   include_vars: Darwin.yml
-#  when: not sshd_from_homebrew
+  tags:
+    - sshd
+
+# Starting with MacOS 10.12 the sshd configuration moved from /etc/ to /etc/ssh/
+# Overwrite the sshd_cfg_dir variable only if configuing system sshd
+# and the OSX version is less then 10.12 (Sierra)
+- name: "[Darwin] Include vars from Darwin_pre_10.12.yml only if configuring system sshd (not the one from homebrew)"
+  include_vars: Darwin_pre_10.12.yml
+  when:
+    - not ansible_distribution_version.startswith('10.12')
+    - sshd_from_homebrew
   tags:
     - sshd
 

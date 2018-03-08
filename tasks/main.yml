@@ -57,21 +57,21 @@
   tags:
     - sshd
 
-- name: "[main] Generate secure /etc/sshd_config (for MacOS before 10.12 Sierra)"
-  template:
-    src: sshd_config.j2
-    dest: "/etc/sshd_config"
-    backup: yes
-    owner: "{{ sshd_cfg_user }}"
-    group: "{{ sshd_cfg_group }}"
-    mode: 0600
-  become: yes
-  notify: Restart sshd
-  when:
-    - ansible_os_family == 'Darwin'
-    - not ansible_distribution_version.startswith('10.12')
-  tags:
-    - sshd
+#- name: "[main] Generate secure /etc/sshd_config (for MacOS before 10.12 Sierra)"
+#  template:
+#    src: sshd_config.j2
+#    dest: "/etc/sshd_config"
+#    backup: yes
+#    owner: "{{ sshd_cfg_user }}"
+#    group: "{{ sshd_cfg_group }}"
+#    mode: 0600
+#  become: yes
+#  notify: Restart sshd
+#  when:
+#    - ansible_os_family == 'Darwin'
+#    - not ansible_distribution_version.startswith('10.12')
+#  tags:
+#    - sshd
 
 # NOTE: in order to manage multiple users, the sshd on the managed host must allow enough sessions.
 # Paramiko module spits out the Warning and Error.
