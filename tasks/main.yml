@@ -26,9 +26,9 @@
     line: 'session    optional     pam_motd.so noupdate'
     state: present
   become: yes
- # MacOS' /etc/pam.d/sshd does not support pam_motd.so option:
- when: ansible_os_family != 'Darwin' #or ansible_distribution_version.startswith('10.13')
- tags:
+  # MacOS' /etc/pam.d/sshd does not support pam_motd.so option:
+  when: ansible_os_family != 'Darwin' #or ansible_distribution_version.startswith('10.13')
+  tags:
     - sshd
 
 - name: "[main] Copy {{ sshd_cfg_dir }}/issue.net ssh banner"
