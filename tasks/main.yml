@@ -52,7 +52,7 @@
     group: "{{ sshd_cfg_group }}"
     mode: 0600
   become: yes
-  when: ansible_os_family != 'Darwin' or ansible_os_family == 'Darwin' and ansible_distribution_version.startswith('10.12')
+  #when: ansible_os_family != 'Darwin' or ansible_os_family == 'Darwin' and ansible_distribution_version.startswith('10.12')
   notify: Restart sshd
   tags:
     - sshd
