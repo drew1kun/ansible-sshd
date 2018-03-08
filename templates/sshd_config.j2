@@ -10,10 +10,10 @@ ListenAddress 0.0.0.0 	# Listen only on the internal network address
 Protocol 2 			# Only use protocol version 2
 
 # HostKeys for protocol version 2:
-HostKey {% if ansible_os_family == 'Darwin' and sshd_from_homebrew %}/usr/local{% endif %}/etc/ssh/ssh_host_rsa_key
-HostKey {% if ansible_os_family == 'Darwin' and sshd_from_homebrew %}/usr/local{% endif %}/etc/ssh/ssh_host_dsa_key
-HostKey {% if ansible_os_family == 'Darwin' and sshd_from_homebrew %}/usr/local{% endif %}/etc/ssh/ssh_host_ecdsa_key
-HostKey {% if ansible_os_family == 'Darwin' and sshd_from_homebrew %}/usr/local{% endif %}/etc/ssh/ssh_host_ed25519_key
+HostKey {{ sshd_cfg_dir }}/ssh_host_rsa_key
+HostKey {{ sshd_cfg_dir }}/ssh_host_dsa_key
+HostKey {{ sshd_cfg_dir }}/ssh_host_ecdsa_key
+HostKey {{ sshd_cfg_dir }}/ssh_host_ed25519_key
 
 #=================================== LOGGING ===================================
 SyslogFacility AUTHPRIV 	# obsoletes QuietMode and FascistLogging
