@@ -9,6 +9,8 @@ Cross-platform ansible role for hardening ssh daemon configuration
 Requirements
 ------------
 
+NOTE: Role requires Fact Gathering by ansible!
+
 One of the following OS (or deriviatives):
  - Debian | Ubuntu
  - CentOS
@@ -79,6 +81,7 @@ Example Playbook
 ----------------
 
     - hosts: macos_hosts
+      gather_facts: yes
       roles:
          - { role: drew-kun.sshd, sshd_port: 2222, sshd_from_homebrew: yes}
 
