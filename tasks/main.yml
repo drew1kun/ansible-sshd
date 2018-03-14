@@ -43,20 +43,6 @@
   tags:
     - sshd
 
-- name: "[main] Generate secure {{ sshd_cfg_dir }}/sshd_config"
-  template:
-    src: sshd_config.j2
-    dest: "{{ sshd_cfg_dir }}/sshd_config"
-    backup: yes
-    owner: "{{ sshd_cfg_user }}"
-    group: "{{ sshd_cfg_group }}"
-    mode: 0600
-  become: yes
-  #when: ansible_os_family != 'Darwin' or ansible_os_family == 'Darwin' and ansible_distribution_version.startswith('10.12')
-  notify: Restart sshd
-  tags:
-    - sshd
-
 # NOTE: in order to manage multiple users, the sshd on the managed host must allow enough sessions.
 # Paramiko module spits out the Warning and Error.
 # Warning: No handlers could be found for logger "paramiko.transport"
@@ -71,6 +57,20 @@
     comment: "{{ item.comment }}"
   become: yes   # this module required for this module; 'become_user: item' won't work
   with_items: "{{ sshd_users | unique }}"
+  notify: Restart sshd
+  tags:
+    - sshd
+
+- name: "[main] Generate secure {{ sshd_cfg_dir }}/sshd_config"
+  template:
+    src: sshd_config.j2
+    dest: "{{ sshd_cfg_dir }}/sshd_config"
+    backup: yes
+    owner: "{{ sshd_cfg_user }}"
+    group: "{{ sshd_cfg_group }}"
+    mode: 0600
+  become: yes
+  #when: ansible_os_family != 'Darwin' or ansible_os_family == 'Darwin' and ansible_distribution_version.startswith('10.12')
   notify: Restart sshd
   tags:
     - sshd
