@@ -21,5 +21,6 @@ sshd_users:
 sshd_root_login: no   # yes | no; No - recommended
                       # If yes, then only passwordless root login (pubkey) will be configured
 
+# MacOS-only:
 sshd_from_homebrew: no
 ...
