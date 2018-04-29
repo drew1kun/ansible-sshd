@@ -1,5 +1,4 @@
 ---
 sshd_wrapper_path: /usr/libexec/sshd-keygen-wrapper
 sshd_sftp_server: /usr/libexec/sftp-server           # used in sshd_config.j2 template only
-sshd_cfg_group: wheel
 ...
