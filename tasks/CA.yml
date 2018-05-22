@@ -1,0 +1,134 @@
+---
+# CREATE HOST CA
+#- name: "[CA] Turn off the host key checking only once for initial key deployment"
+#  shell: export ANSIBLE_HOST_KEY_CHECKING=False
+#  delegate_to: localhost
+
+- name: "[CA] Check locally if {{ sshd_host_ca }} key pair already exists"
+  stat: path="{{ item }}"
+  register: sshd_host_ca_keys
+  with_items: [ "{{ sshd_host_ca }}", "{{ sshd_host_ca }}.pub" ]
+  delegate_to: localhost
+
+- name: '[CA] Combine the results into dictionary with following structure: {<key_file> : <stat.exists>}'
+  set_fact:
+    # https://stackoverflow.com/questions/35605603/using-ansible-set-fact-to-create-a-dictionary-from-register-results
+    # FLATTENING THE RESULTS AND COMBINING THEM INTO DICTIONARY WITH SPECIFIED KEY:VALUE STRUCTURE:
+    sshd_host_ca_keys_exist: "{{ sshd_host_ca_keys_exist|default({}) | combine( {item.item: item.stat.exists} ) }}"
+  with_items: "{{ sshd_host_ca_keys.results }}"
+  no_log: yes
+
+- name: "[CA] Cleanup old broken CA key files"
+  file:
+    path: "{{ item.key }}"
+    state: absent
+  become: yes
+  with_dict: "{{ sshd_host_ca_keys_exist }}"
+  delegate_to: localhost
+  when:
+    - false in sshd_host_ca_keys_exist.values()  # Cleanup only when key pair is broken
+    - item.value # Remove the key which exists, skip task for key which doesn't exist
+
+- name: "[CA] Create a Host CA key pair if it doesn't exist"
+  shell:
+    ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_host_ca }} \
+    -q -N {{ sshd_host_ca_pwd }} -C {{ sshd_ca_comment }}
+  args:
+    chdir: /etc/ssh
+  become: yes
+  delegate_to: localhost
+  when: false in sshd_host_ca_keys_exist.values()
+
+- name: "[CA] Register the Host CA public key content for furher usage in known_hosts"
+  shell: "cat {{ sshd_host_ca }}.pub"
+  register: sshd_host_ca_pub
+  changed_when: false
+  delegate_to: localhost
+
+- name: "[CA] Copy locally Host CA's public key to known_hosts file"
+  lineinfile:
+    path: ~/.ssh/known_hosts
+    line: "@cert-authority * {{ sshd_host_ca_pub.stdout }}"
+  delegate_to: localhost
+  become: yes
+  become_user: "{{ item }}"
+  with_items: [ "{{ ansible_user_id }}", 'root' ]
+
+
+# ISSUE HOST CERTIFICATE
+- name: "[CA] Generate host key pair"
+  shell: echo "y" | ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f /tmp/ssh_host_{{ sshd_algo }}_key
+  delegate_to: localhost
+
+- name: "[CA] Sign the host key and generate certificate"
+  shell: ssh-keygen -s {{ sshd_host_ca }} -h -V +52w -I {{ sshd_cert_id }}-host /tmp/ssh_host_{{ sshd_algo }}_key.pub
+  register: sshd_eventlog
+  delegate_to: localhost
+
+- name: "[CA] Log the key signing event"
+  shell: echo {{ sshd_eventlog }} >> {{ sshd_certlogger }}
+  delegate_to: localhost
+
+- name: "[CA] Copy host private key with correct permissions - 0600"
+  copy:
+    src: "/tmp/ssh_host_{{ sshd_algo }}_key"
+    dest: "{{ sshd_cfg_dir }}"
+    mode: 0600
+  become: yes
+
+- name: "[CA] Copy certificate to a host with correct permissions - 0644"
+  copy:
+    src: "/tmp/ssh_host_{{ sshd_algo }}_key-cert.pub"
+    dest: "{{ sshd_cfg_dir }}"
+    mode: 0644
+  become: yes
+
+
+# CREATE USER CA
+- name: "[CA] Check locally if {{ sshd_user_ca }} key pair already exists"
+  stat: path="{{ item }}"
+  register: sshd_user_ca_keys
+  with_items: [ "{{ sshd_user_ca }}", "{{ sshd_user_ca }}.pub" ]
+  delegate_to: localhost
+
+- name: "[CA] Combine the results into dictionary with following structure: {<UserCA_key_file> : <stat.exists>"
+  set_fact:
+    # https://stackoverflow.com/questions/35605603/using-ansible-set-fact-to-create-a-dictionary-from-register-results
+    # FLATTENING THE RESULTS AND COMBINING THEM INTO DICTIONARY WITH SPECIFIED KEY:VALUE STRUCTURE:
+    sshd_user_ca_keys_exist: "{{ sshd_user_ca_keys_exist|default({}) | combine( {item.item: item.stat.exists} ) }}"
+  with_items: "{{ sshd_user_ca_keys.results }}"
+  no_log: yes
+
+- name: "[CA] Cleanup old broken User CA key files"
+  file:
+    path: "{{ item.key }}"
+    state: absent
+  become: yes
+  with_dict: "{{ sshd_user_ca_keys_exist }}"
+  delegate_to: localhost
+  when:
+    - false in sshd_user_ca_keys_exist.values()  # Cleanup only when key pair is broken
+    - item.value # Remove the key which exists, skip task for key which doesn't exist
+
+- name: "[CA] Create a User CA key"
+  shell: ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_user_ca }} -q -N {{ sshd_user_ca_pwd }}
+  args:
+    chdir: /etc/ssh
+  delegate_to: localhost
+  when: false in sshd_user_ca_keys_exist.values()
+
+- name: "[CA] Sign the specified user public key with User CA"
+  shell:
+    ssh-keygen -s {{ sshd_user_ca }} -n {{ item }} -V +52w \
+    -I {{ sshd_cert_id }}-{{ item }} ~/.ssh/id_rsa.pub
+  with_items: "{{ sshd_client_users }}"
+  delegate_to: localhost
+
+- name: "[CA] Copy User CA public key to a host with correct permissions - 0644"
+  copy:
+    src: "{{ sshd_user_ca }}.pub"
+    dest: "{{ sshd_cfg_dir }}"
+    mode: 0644
+  register: sshd_user_ca_pub
+  become: yes
+...

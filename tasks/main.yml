@@ -1,77 +1,41 @@
 ---
 # tasks file for ansible-sshd
 
-- name: "[main] Include Darwin-specific tasks if provisioning MacOS"
-  include_tasks:  Darwin.yml
-  when: ansible_os_family == 'Darwin'
-  tags:
-    - sshd
-
-- name: "[main] Copy /etc/motd message of the day"
-  copy:
-    src: motd
-    dest: /etc/motd
-    owner: root
-    group: "{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
-    mode: 0664  # on Debian 0600 - works for any user; on CentOS - must be readable by anyone
-  become: yes
-  notify: Restart sshd
-  tags:
-    - sshd
-
-- name: '[main] Modify /etc/pam.d/sshd to show motd on login'
-  lineinfile:
-    path: /etc/pam.d/sshd
-    regexp: 'session\s*optional\s*pam_motd.so\s*noupdate'
-    line: 'session    optional     pam_motd.so noupdate'
-    state: present
-  become: yes
-  # MacOS' /etc/pam.d/sshd does not support pam_motd.so option:
-  when: ansible_os_family != 'Darwin' #or ansible_distribution_version.startswith('10.13')
-  tags:
-    - sshd
-
-- name: "[main] Copy {{ sshd_cfg_dir }}/issue.net ssh banner"
-  copy:
-    src: issue.net
-    dest: "{{ sshd_cfg_dir }}/issue.net"
-    owner: root
-    group: "{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
-    mode: 0600
-  become: yes
-  notify: Restart sshd
-  tags:
-    - sshd
-
-# NOTE: in order to manage multiple users, the sshd on the managed host must allow enough sessions.
-# Paramiko module spits out the Warning and Error.
-# Warning: No handlers could be found for logger "paramiko.transport"
-# Error: 'Failed to open session'
-# Solution: set 'MaxSessions 4' (or higher)in sshd_config before provisioning
+#- name: '[main] Include Darwin-specific tasks if provisioning MacOS'
+#  include_tasks: Darwin.yml
+#  when: ansible_os_family == 'Darwin'
+#  tags:
+#    - sshd
 #
-- name: "[main] Adding public ssh-key to ~/.ssh/authorized_keys"
-  authorized_key:
-    user: "{{ item.username }}"
-    state: present
-    key: "{{ item.key }}"
-    comment: "{{ item.comment }}"
-  become: yes   # this module required for this module; 'become_user: item' won't work
-  with_items: "{{ sshd_users | unique }}"
-  notify: Restart sshd
+#- name: '[main] Include Host CA tasks if using SSH Certificates for hardening setup'
+#  include_tasks: CA_Host.yml
+#  when: sshd_certs
+#  tags:
+#    - sshd
+
+#- name: "[setup] Generate secure {{ sshd_cfg_dir }}/sshd_config"
+#  template:
+#    src: sshd_config.j2
+#    dest: "{{ sshd_cfg_dir }}/sshd_config"
+#    backup: yes
+#    owner: root
+#    group: "{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
+#    mode: 0600
+#  become: yes
+#  #when: ansible_os_family != 'Darwin' or ansible_os_family == 'Darwin' and ansible_distribution_version.startswith('10.12')
+#  notify: Restart sshd
+#  tags:
+#    - sshd
+
+- name: '[main] Include User CA tasks if using SSH Certificates for hardening setup'
+  include_tasks: CA_User.yml
+  when: sshd_certs
   tags:
     - sshd
 
-- name: "[main] Generate secure {{ sshd_cfg_dir }}/sshd_config"
-  template:
-    src: sshd_config.j2
-    dest: "{{ sshd_cfg_dir }}/sshd_config"
-    backup: yes
-    owner: root
-    group: "{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
-    mode: 0600
-  become: yes
-  #when: ansible_os_family != 'Darwin' or ansible_os_family == 'Darwin' and ansible_distribution_version.startswith('10.12')
-  notify: Restart sshd
-  tags:
-    - sshd
+#- name: '[main] Include tasks for sshd setup'
+#  include_tasks: setup.yml
+#  tags:
+#    - sshd
+
 ...

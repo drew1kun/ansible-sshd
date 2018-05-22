@@ -1,6 +1,9 @@
 ---
 # defaults file for sshd
 
+#============ Basic Setup ===============
+sshd_algo: ed25519  # Algorithm for SSH keys and CAs (rsa, dsa, ecdsa, ed25519) - ed25519 or rsa preferred.
+
 sshd_port: 22
 
 # NOTE: in order to manage multiple users, the sshd on the managed host must allow enough sessions.
@@ -9,18 +12,45 @@ sshd_port: 22
 # Error: 'Failed to open session'
 # Solution: set 'MaxSessions 4' (or higher)in sshd_config before provisioning
 #
+# Users on ssh server host to be configured:
 sshd_users:
   - username: "{{ ansible_user_id }}"
-    key: "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"
+    key: "{{ lookup('file', 'pub_keys/id_ed25519.pub') }}" # Key to be used if NOT using certificate setup (sshd_certs: no)
+    keypath: ~/.ssh/id_ed25519 # Path to user private key to be signed with User CA. If key doesn't exist it will be created
     comment:
 
   - username: drew
-    key: "{{ lookup('file', 'pub_keys/id_rsa.pub') }}"
+    key: "{{ lookup('file', 'pub_keys/id_ed25519.pub') }}" # Key to be used if NOT using certificate setup (sshd_certs: no)
+    keypath: ~/.ssh/id_rsa # Path to user private key to be signed with User CA. If key doesn't exist it will be created
     comment:
 
 sshd_root_login: no   # yes | no; No - recommended
                       # If yes, then only passwordless root login (pubkey) will be configured
 
-# MacOS-only:
-sshd_from_homebrew: no
+# MacOS hosts only:
+sshd_from_homebrew: no  # Upgrade OpenSSH server from Homebrew?
+#=======================================
+
+#========= Certificate Setup ============
+# SSH Certificate Setup:
+sshd_certs: yes  # Harden sshd configuration using Host and User certificates
+
+# Users on ssh client do not nessecary have to exist on server
+# But all client user's keys must be signed by User CA
+sshd_client_users:            # So here is the list of users on client, whose keys to be signed,
+  - username: root            # and ~/.ssh/known_host to be modified with public Host CA certificate key
+    key: ~/.ssh/id_rsa        # Path to user ssh-key to be signed by User CA.
+                              # If keys don't exist, they will be generated using specified `sshd_algo` algorithm
+  - username: drew
+    key: ~/.ssh/id_rsa
+
+sshd_host_ca: "{{ sshd_cfg_dir }}/id_{{ sshd_algo }}-HostCA"  # Full path to Host CA.
+sshd_user_ca: "{{ sshd_cfg_dir }}/id_{{ sshd_algo }}-UserCA"  # Full path to User CA.
+sshd_host_ca_pwd: "" # Host CA private key passphrase
+sshd_user_ca_pwd: "" # User CA private key paasphrase
+sshd_ca_comment: ""
+sshd_cert_id: cypherpunk.local  # Host Identifier, used in Logging and Revoking the Certificate.
+sshd_certlogger: /usr/local/var/log/cert-signing.log
+#=======================================
+
 ...

@@ -10,10 +10,12 @@ ListenAddress 0.0.0.0 	# Listen only on the internal network address
 Protocol 2 			# Only use protocol version 2
 
 # HostKeys for protocol version 2:
-HostKey {{ sshd_cfg_dir }}/ssh_host_rsa_key
-HostKey {{ sshd_cfg_dir }}/ssh_host_dsa_key
-HostKey {{ sshd_cfg_dir }}/ssh_host_ecdsa_key
-HostKey {{ sshd_cfg_dir }}/ssh_host_ed25519_key
+HostKey {{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key
+{% if sshd_certs %}
+HostCertificate {{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key-cert.pub
+{% endif %}
+TrustedUserCAKeys {{ sshd_user_ca_pub.dest }}
+
 
 #=================================== LOGGING ===================================
 SyslogFacility AUTHPRIV 	# obsoletes QuietMode and FascistLogging

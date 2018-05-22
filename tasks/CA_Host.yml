@@ -1,0 +1,136 @@
+---
+# CREATE HOST CA
+#- name: "[CA_Host] Turn off the host key checking only once for initial key deployment"
+#  shell: export ANSIBLE_HOST_KEY_CHECKING=False
+#  delegate_to: localhost
+
+- name: "[CA_Host] Locally check if {{ sshd_host_ca }} key pair already exists"
+  stat: path="{{ item }}"
+  register: sshd_host_ca_keys
+  with_items:
+    - "{{ sshd_host_ca }}"
+    - "{{ sshd_host_ca }}.pub"
+  delegate_to: localhost
+
+- name: "[CA_Host] Combine the results into dictionary with following structure: {<HostCA_key_file> : <stat.exists>}"
+  set_fact:
+    # https://stackoverflow.com/questions/35605603/using-ansible-set-fact-to-create-a-dictionary-from-register-results
+    # FLATTENING THE RESULTS AND COMBINING THEM INTO DICTIONARY WITH SPECIFIED KEY:VALUE STRUCTURE:
+    sshd_host_ca_keys_exist: "{{ sshd_host_ca_keys_exist|default({}) | combine( {item.item: item.stat.exists} ) }}"
+  with_items: "{{ sshd_host_ca_keys.results }}"
+  no_log: yes
+
+- name: "[CA_Host] Locally cleanup old broken CA key files"
+  file:
+    path: "{{ item.key }}"
+    state: absent
+  become: yes
+  with_dict: "{{ sshd_host_ca_keys_exist }}"
+  delegate_to: localhost
+  when:
+    - false in sshd_host_ca_keys_exist.values()  # Cleanup only when key pair is broken
+    - item.value # Remove the key which exists, skip task for key which doesn't exist
+
+- name: "[CA_Host] Locally create a Host CA key pair if it doesn't exist"
+  shell:
+    ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_host_ca }} \
+    -q -N "{{ sshd_host_ca_pwd }}" #-C "{{ sshd_ca_comment }}"
+#  args:
+#    chdir: /etc/ssh
+  become: yes
+  delegate_to: localhost
+  when: false in sshd_host_ca_keys_exist.values()
+
+- name: "[CA_Host] Locally register the Host CA public key content using 'cat' for furher usage in known_hosts"
+  shell: "cat {{ sshd_host_ca }}.pub"
+  register: sshd_host_ca_pub
+  changed_when: false
+  delegate_to: localhost
+
+- name: "[CA_Host] Locally copy Host CA's public key to known_hosts file"
+  lineinfile:
+    path: ~/.ssh/known_hosts
+    line: "@cert-authority * {{ sshd_host_ca_pub.stdout }}"
+  delegate_to: localhost
+  become: yes
+  become_user: "{{ item }}"
+  #with_items: [ "{{ ansible_user_id }}", 'root' ]
+  with_items: [ 'drew', 'root' ]
+
+# ISSUE HOST CERTIFICATE
+# remote checks:
+- name: "[CA_Host] Check if host keys and cert exist"
+  stat: path="{{ item }}"
+  register: sshd_host_keys
+  with_items:
+    - "{{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key"
+    - "{{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key.pub"
+    - "{{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key-cert.pub"
+
+- name: "[CA_Host] Combine the results into dictionary with following structure: {<host_key_file> : <stat.exists>}"
+  set_fact:
+    # https://stackoverflow.com/questions/35605603/using-ansible-set-fact-to-create-a-dictionary-from-register-results
+    # FLATTENING THE RESULTS AND COMBINING THEM INTO DICTIONARY WITH SPECIFIED KEY:VALUE STRUCTURE:
+    sshd_host_keys_exist: "{{ sshd_host_keys_exist|default({}) | combine( {item.item: item.stat.exists} ) }}"
+  with_items: "{{ sshd_host_keys.results }}"
+  no_log: yes
+
+- name: "[CA_Host] Check the Signing CA fingerprint on host cert when all host keys and cert exist"
+  shell:
+    ssh-keygen -L -f {{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key-cert.pub | \
+    fgrep "Signing CA" | sed 's/^[ \t]*//' | cut -d ' ' -f 4
+  become: yes
+  register: sshd_host_cert_ca_fpr
+  changed_when: false
+  when: not false in sshd_host_keys_exist.values()
+
+- name: "[CA_Host] Locally check the CA fingerprint if the host cert exists"
+  shell: ssh-keygen -l -f {{ sshd_host_ca }} | cut -d ' ' -f 2
+  become: yes
+  delegate_to: localhost
+  register: sshd_host_ca_fpr
+  changed_when: false
+  when: not false in sshd_host_keys_exist.values()
+
+- name: "[CA_Host] Locally generate host key pair if there is no correct host certificate already on the system"
+  command: ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f /tmp/ssh_host_{{ sshd_algo }}_key
+  #shell: echo "y" | ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f /tmp/ssh_host_{{ sshd_algo }}_key
+  delegate_to: localhost
+  when: false in sshd_host_keys_exist.values() or sshd_host_cert_ca_fpr.stdout != sshd_host_ca_fpr.stdout
+
+- name: "[CA_Host] Locally sign the host key and generate certificate"
+  shell: ssh-keygen -s {{ sshd_host_ca }} -h -V +52w -I {{ sshd_cert_id }}-host /tmp/ssh_host_{{ sshd_algo }}_key.pub
+  register: sshd_eventlog
+  become: yes
+  delegate_to: localhost
+  when: false in sshd_host_keys_exist.values() or sshd_host_cert_ca_fpr.stdout != sshd_host_ca_fpr.stdout
+
+- name: "[CA_Host] Locally log the key signing event"
+  shell: echo {{ sshd_eventlog }} >> {{ sshd_certlogger }}
+  delegate_to: localhost
+  when: sshd_eventlog.changed
+
+- name: "[CA_Host] Copy host public key and host certificate to a host with correct permissions - 0644"
+  copy: src="{{ item }}" dest="{{ sshd_cfg_dir }}" mode=0644
+  become: yes
+  with_items:
+    - "/tmp/ssh_host_{{ sshd_algo }}_key.pub"
+    - "/tmp/ssh_host_{{ sshd_algo }}_key-cert.pub"
+  when: false in sshd_host_keys_exist.values() or sshd_host_cert_ca_fpr.stdout != sshd_host_ca_fpr.stdout
+
+- name: "[CA_Host] Copy host private key with correct permissions - 0600"
+  copy: src="/tmp/ssh_host_{{ sshd_algo }}_key" dest="{{ sshd_cfg_dir }}" mode=0600
+  become: yes
+  when: false in sshd_host_keys_exist.values() or sshd_host_cert_ca_fpr.stdout != sshd_host_ca_fpr.stdout
+
+#- HostCertificate {{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key-cert.pub
+
+
+#- name: "[CA_Host] Copy host public key and host certificate to a host with correct permissions - 0644"
+#  copy: src="{{ item }}" dest="{{ sshd_cfg_dir }}" mode=0644
+#  become: yes
+#  with_items:
+#    - "/tmp/ssh_host_{{ sshd_algo }}_key.pub"
+#    - "/tmp/ssh_host_{{ sshd_algo }}_key-cert.pub"
+#  when: false in sshd_host_keys_exist.values() or sshd_host_cert_ca_fpr.stdout != sshd_host_ca_fpr.stdout
+...

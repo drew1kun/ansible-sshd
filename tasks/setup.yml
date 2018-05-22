@@ -1,0 +1,70 @@
+---
+- name: "[setup] Copy /etc/motd message of the day"
+  copy:
+    src: motd
+    dest: /etc/motd
+    owner: root
+    group: "{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
+    mode: 0664  # on Debian 0600 - works for any user; on CentOS - must be readable by anyone
+  become: yes
+  notify: Restart sshd
+  tags:
+    - sshd
+
+- name: '[setup] Modify /etc/pam.d/sshd to show motd on login'
+  lineinfile:
+    path: /etc/pam.d/sshd
+    regexp: 'session\s*optional\s*pam_motd.so\s*noupdate'
+    line: 'session    optional     pam_motd.so noupdate'
+    state: present
+  become: yes
+  # MacOS' /etc/pam.d/sshd does not support pam_motd.so option:
+  when: ansible_os_family != 'Darwin' #or ansible_distribution_version.startswith('10.13')
+  tags:
+    - sshd
+
+- name: "[setup] Copy {{ sshd_cfg_dir }}/issue.net ssh banner"
+  copy:
+    src: issue.net
+    dest: "{{ sshd_cfg_dir }}/issue.net"
+    owner: root
+    group: "{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
+    mode: 0600
+  become: yes
+  notify: Restart sshd
+  tags:
+    - sshd
+
+# NOTE: in order to manage multiple users, the sshd on the managed host must allow enough sessions.
+# Paramiko module spits out the Warning and Error.
+# Warning: No handlers could be found for logger "paramiko.transport"
+# Error: 'Failed to open session'
+# Solution: set 'MaxSessions 4' (or higher)in sshd_config before provisioning
+#
+- name: "[setup] Adding public ssh-key to ~/.ssh/authorized_keys"
+  authorized_key:
+    user: "{{ item.username }}"
+    state: present
+    key: "{{ item.key }}"
+    comment: "{{ item.comment }}"
+  become: yes   # this module required for this module; 'become_user: item' won't work
+  with_items: "{{ sshd_users | unique }}"
+  when: not sshd_certs
+  notify: Restart sshd
+  tags:
+    - sshd
+
+- name: "[setup] Generate secure {{ sshd_cfg_dir }}/sshd_config"
+  template:
+    src: sshd_config.j2
+    dest: "{{ sshd_cfg_dir }}/sshd_config"
+    backup: yes
+    owner: root
+    group: "{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
+    mode: 0600
+  become: yes
+  #when: ansible_os_family != 'Darwin' or ansible_os_family == 'Darwin' and ansible_distribution_version.startswith('10.12')
+  notify: Restart sshd
+  tags:
+    - sshd
+...
