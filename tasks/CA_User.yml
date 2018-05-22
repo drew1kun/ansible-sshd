@@ -52,8 +52,8 @@
     with_items: "{{ sshd_users }}"
   no_log: yes
 
-#- debug:
-#    msg: "sshd_user_uniq_keys: {{ sshd_user_uniq_keys }}"
+- debug:
+    msg: "sshd_user_uniq_keys: {{ sshd_user_uniq_keys }}"
 
 - name: "[CA_User] Locally check if user private keys already exist"
   stat: path="{{ item }}"
@@ -83,24 +83,8 @@
 #======= priv keys check end =======
 
 #====== pub keys check start =======
+# IF it is necessary to dynamically create a variable containing specific data:
 # https://stackoverflow.com/questions/29399581/using-set-facts-and-with-items-together-in-ansible#29817564
-#- name: "[CA_User] Create public key list setp 1: setting facts"
-#  set_fact:
-#    sshd_usr_k_item: "{{ item }}.pub"
-#  register: sshd_usr_k_result
-#  with_items: "{{ sshd_user_uniq_keys }}"
-#  when: true in sshd_user_keys_exist.values() # if no private keys exist, then they were generated with public keys
-#
-## sshd_user_uniq_keys_pub
-#- name: "[CA_User] Create public key list setp 2: mapping facts to variable list"
-#  set_fact:
-#    sshd_user_uniq_keys_pub:
-#      "{{ sshd_usr_k_result.results | map(attribute='ansible_facts.sshd_usr_k_item') | list }}"
-#  when: true in sshd_user_keys_exist.values()
-
-#- debug:
-#    msg: "sshd_user_uniq_keys_pub: {{ sshd_user_uniq_keys_pub }}"
-
 - name: "[CA_User] Locally check if user pub keys already exist"
   stat: path="{{ item }}.pub"
   register: sshd_user_keys_pub
@@ -108,12 +92,15 @@
   delegate_to: localhost
   when: true in sshd_user_keys_exist.values()
 
+- debug:
+    msg: "sshd_user_keys_pub.results: {{ sshd_user_keys_pub.results }}"
+
 - name: "[CA_User] Create the list of dictionaries with following structure: { priv_key: value, pub_key: value, pub_exists: boolean }"
   set_fact:
     # https://stackoverflow.com/questions/35605603/using-ansible-set-fact-to-create-a-dictionary-from-register-results
     # FLATTENING THE RESULTS AND COMBINING THEM INTO A LIST OF DICTIONARIES
     sshd_user_keys_pub_retrieve:
-      "{{ sshd_user_keys_pub_retrieve|default([]) + [{ 'priv_key': item[0], 'pub_key': item[1].item, 'pub_exists': item[1].stat.exists }] }}"
+      "{{ sshd_user_keys_pub_retrieve|default([]) + [{ 'priv_key': item[0], 'pub_key': item[1].stat.path, 'pub_exists': item[1].stat.exists }] }}"
   with_together:
     - "{{ sshd_user_uniq_keys }}"
     - "{{ sshd_user_keys_pub.results }}"
@@ -133,24 +120,51 @@
 #====== pub keys check start =======
 
 #===== certificate check start =====
+#- name: "[CA_User] Locally check if user key certificates already exist"
+#  stat: path="{{ item }}-cert.pub"
+#  register: sshd_user_certs
+#  with_items: "{{ sshd_user_uniq_keys }}"
+#  delegate_to: localhost
+#  when: true in sshd_user_keys_exist.values() # If all keys are in place check if ther certs exist
+
 - name: "[CA_User] Locally check if user key certificates already exist"
   stat: path="{{ item }}-cert.pub"
   register: sshd_user_certs
   with_items: "{{ sshd_user_uniq_keys }}"
   delegate_to: localhost
-  when: true in sshd_user_keys_exist.values() # If all keys are in place check if ther certs exist
+#  when: true in sshd_user_keys_exist.values()
+
 
 - debug:
-    msg: " sshd_user_certs: {{ sshd_user_certs }}" # LIST OF UNIQ CERTS
+    msg: " sshd_user_keys_pub.results.stat.path: {{ item.stat.path }}" # LIST OF UNIQ CERTS
+  with_items: "{{ sshd_user_keys_pub.results }}"
 
-# get list of certificates for uniq user keys
-- name: "[CA_User] Combine the results into dictionary with following structure: {<user_uniq_cert_file> : <stat.exists>"
+- debug:
+    msg: " sshd_user_certs.results.stat.path: {{ item.stat.path }}" # LIST OF UNIQ CERTS
+  with_items: "{{ sshd_user_certs.results }}"
+
+## get list of certificates for uniq user keys
+#  set_fact:
+#    # https://stackoverflow.com/questions/35605603/using-ansible-set-fact-to-create-a-dictionary-from-register-results
+#    # FLATTENING THE RESULTS AND COMBINING THEM INTO DICTIONARY WITH SPECIFIED KEY:VALUE STRUCTURE:
+#    sshd_user_certs_exist: "{{ sshd_user_certs_exist|default({}) | combine( {item.item: item.stat.exists} ) }}"
+#  with_items: "{{ sshd_user_certs.results }}"
+#  no_log: yes
+
+- name: "[CA_User] Combine the results into dictionary with following structure: { pub_key: value, cert: value, cert_exists: boolean }"
   set_fact:
     # https://stackoverflow.com/questions/35605603/using-ansible-set-fact-to-create-a-dictionary-from-register-results
-    # FLATTENING THE RESULTS AND COMBINING THEM INTO DICTIONARY WITH SPECIFIED KEY:VALUE STRUCTURE:
-    sshd_user_certs_exist: "{{ sshd_user_certs_exist|default({}) | combine( {item.item: item.stat.exists} ) }}"
-  with_items: "{{ sshd_user_certs.results }}"
-  no_log: yes
+    # FLATTENING THE RESULTS AND COMBINING THEM INTO A LIST OF DICTIONARIES
+    sshd_user_certs_exist:
+     #"{{ sshd_user_certs_exist|default([]) + [{ 'pub_key': item[1].stat.path, 'cert': item[0].stat.path, 'cert_exists': item[0].stat.exists }] }}"
+      "{{ sshd_user_certs_exist|default([]) + [{ 'cert': item.stat.path, 'cert_exists': item.stat.exists }] }}"
+  #with_together:
+  with_items:
+    - "{{ sshd_user_certs.results }}"
+    #- "{{ sshd_user_keys_pub.results }}"
+  #no_log: yes
+  #when: true in sshd_user_keys_exist.values()
+
 
 - debug: msg="{{ sshd_user_certs_exist }}"
 
@@ -177,28 +191,6 @@
 
 #- debug:
 #    msg: "sshd_user_ca_fpr: {{ sshd_user_ca_fpr }}"
-
-#- set_fact:
-#    sshd_subelements:
-#      - "{{ sshd_users }}"
-#      - "certs_exist_dict: {{ sshd_user_certs_exist }}"
-#      - "{{ sshd_user_certs_ca_fpr }}"
-#
-#- debug:
-#    msg:
-#      - "sshd_subelements: {{ sshd_subelements }}"
-#
-#- debug:
-#    msg:
-#      - "sshd-users: {{ item.0.username }}"
-#      - "{{ item.1.key }} : {{ item.1.value }}"
-##      - "sshd_user_certs_ca_fpr: {{ item[2].stdout }}"
-#  with_subelements:
-#    - sshd_subelements
-#  when:
-#    - item[1] == item[0].keypath
-#    #- item[1].value == False # NOT FULL
-
 
 #- name: "[CA_User] Sign the specified user public key with User CA"
 #  shell:
