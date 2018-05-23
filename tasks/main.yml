@@ -27,11 +27,18 @@
 #  tags:
 #    - sshd
 
+#- name: '[main] Include User CA tasks if using SSH Certificates for hardening setup'
+#  include_tasks: CA_User.yml
+#  when: sshd_certs
+#  tags:
+#    - sshd
+
 - name: '[main] Include User CA tasks if using SSH Certificates for hardening setup'
-  include_tasks: CA_User.yml
+  include_tasks: CA_User_certs.yml
   when: sshd_certs
   tags:
     - sshd
+
 
 #- name: '[main] Include tasks for sshd setup'
 #  include_tasks: setup.yml

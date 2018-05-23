@@ -1,214 +1,44 @@
 ---
-## CREATE USER CA
-#- name: "[CA_User] Locally check if {{ sshd_user_ca }} key pair already exists"
-#  stat: path="{{ item }}"
-#  register: sshd_user_ca_keys
-#  with_items:
-#    - "{{ sshd_user_ca }}"
-#    - "{{ sshd_user_ca }}.pub"
-#  delegate_to: localhost
-#
-#- name: "[CA_User] Combine the results into dictionary with following structure: {<UserCA_key_file> : <stat.exists>"
-#  set_fact:
-#    # https://stackoverflow.com/questions/35605603/using-ansible-set-fact-to-create-a-dictionary-from-register-results
-#    # FLATTENING THE RESULTS AND COMBINING THEM INTO DICTIONARY WITH SPECIFIED KEY:VALUE STRUCTURE:
-#    sshd_user_ca_keys_exist: "{{ sshd_user_ca_keys_exist|default({}) | combine( {item.item: item.stat.exists} ) }}"
-#  with_items: "{{ sshd_user_ca_keys.results }}"
-#  no_log: yes
-#
-#- name: "[CA_User] Locally cleanup old broken User CA key files"
-#  file:
-#    path: "{{ item.key }}"
-#    state: absent
-#  become: yes
-#  with_dict: "{{ sshd_user_ca_keys_exist }}"
-#  delegate_to: localhost
-#  when:
-#    - false in sshd_user_ca_keys_exist.values()  # Cleanup only when key pair is broken
-#    - item.value # Make it efficient: remove the key which exists, skip task for key which doesn't exist
-#
-#- name: "[CA_User] Locally reate a User CA key"
-#  shell: ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_user_ca }} -q -N {{ sshd_user_ca_pwd }}
-#  delegate_to: localhost
-#  register: sshd_user_ca_created
-#  when: false in sshd_user_ca_keys_exist.values()
-#
-#- name: "[CA_User] Copy User CA public key to sshd server"
-#  copy:
-#    src: "{{ sshd_user_ca }}.pub"
-#    dest: "{{ sshd_cfg_dir }}"
-#    mode: 0644
-#    owner: root
-#    group: "{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
-#  become: yes
-
-
-# SIGN USER PUBLIC KEYS
-#======= priv keys check start =======
-#sshd_user_uniq_keys
-- name: "[CA_User] Get list of uniqe ssh keys for all users to be signed with User CA"
-  set_fact:
-    sshd_user_uniq_keys: "{{ sshd_users|map(attribute='keypath')|list|unique }}"  # LIST OF UNIQ KEYS
-    with_items: "{{ sshd_users }}"
-  no_log: yes
-
-#- debug: msg="{{ sshd_user_uniq_keys }}"
-
-- name: "[CA_User] Locally check if user private keys already exist"
+# CREATE USER CA
+- name: "[CA_User] Locally check if {{ sshd_user_ca }} key pair already exists"
   stat: path="{{ item }}"
-  register: sshd_user_keys
-  with_items: "{{ sshd_user_uniq_keys }}"
+  register: sshd_user_ca_keys
+  with_items:
+    - "{{ sshd_user_ca }}"
+    - "{{ sshd_user_ca }}.pub"
   delegate_to: localhost
 
-- name: "[CA_User] Combine the results into dictionary with following structure: {<user_key> : <stat.exists>"
+- name: "[CA_User] Combine the results into dictionary with following structure: {<UserCA_key_file> : <stat.exists>"
   set_fact:
-    sshd_user_keys_exist: "{{ sshd_user_keys_exist|default({}) | combine( {item.item: item.stat.exists} ) }}"
-  with_items: "{{ sshd_user_keys.results }}"
+    # https://stackoverflow.com/questions/35605603/using-ansible-set-fact-to-create-a-dictionary-from-register-results
+    # FLATTENING THE RESULTS AND COMBINING THEM INTO DICTIONARY WITH SPECIFIED KEY:VALUE STRUCTURE:
+    sshd_user_ca_keys_exist: "{{ sshd_user_ca_keys_exist|default({}) | combine( {item.item: item.stat.exists} ) }}"
+  with_items: "{{ sshd_user_ca_keys.results }}"
   no_log: yes
 
-#- debug:
-#    msg: "sshd_user_keys_exist: {{ sshd_user_keys_exist }}"
-
-- name: "[CA_User] Locally generate user key pairs if any private keys do not exist"
-  command: ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f /tmp/ssh_host_{{ sshd_algo }}_key
-  #shell: echo "y" | ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f /tmp/ssh_host_{{ sshd_algo }}_key
-  delegate_to: localhost
-  with_dict: "{{ sshd_user_keys_exist }}"
-  when:
-    - false in sshd_user_keys_exist.values() # Do this task only if any private keys do not exist
-    - not item.key  # Create specific key pair only if private key doesn't exist
-#======= priv keys check end =======
-
-#====== pub keys check start =======
-# IF it is necessary to dynamically create a variable containing specific data:
-# https://stackoverflow.com/questions/29399581/using-set-facts-and-with-items-together-in-ansible#29817564
-- name: "[CA_User] Create public key list setp 1: setting facts"
-  set_fact:
-    sshd_usr_k_item: "{{ item }}.pub"
-  register: sshd_usr_k_result
-  with_items: "{{ sshd_user_uniq_keys }}"
-  when: true in sshd_user_keys_exist.values() # if no private keys exist, then they were generated with public keys
-
-- name: "[CA_User] Create public key list setp 2: mapping facts to variable list"
-  set_fact:
-    sshd_user_uniq_keys_pub:
-      "{{ sshd_usr_k_result.results | map(attribute='ansible_facts.sshd_usr_k_item') | list }}"
-  when: true in sshd_user_keys_exist.values()
-# This two actions are necessary because if the item does not exist, then results doesnt contain the 'path' key
-
-#- debug: msg="{{ sshd_user_uniq_keys_pub }}"
-
-- name: "[CA_User] Locally check if user pub keys already exist"
-  stat: path="{{ item }}"
-  register: sshd_user_keys_pub
-  with_items: "{{ sshd_user_uniq_keys_pub }}"
-  delegate_to: localhost
-  when: true in sshd_user_keys_exist.values()
-
-- name: "[CA_User] Create the list of dictionaries with following structure: { priv_key: value, pub_key: value, pub_exists: boolean }"
-  set_fact:
-    sshd_user_keys_pub_retrieve:
-      "{{ sshd_user_keys_pub_retrieve|default([]) + [{ 'priv_key': item[0], 'pub_key': item[1].item, 'pub_exists': item[1].stat.exists }] }}"
-  with_together:
-    - "{{ sshd_user_uniq_keys }}"
-    - "{{ sshd_user_keys_pub.results }}"
-  no_log: yes
-  when: true in sshd_user_keys_exist.values()
-
-#- debug: msg="{{ sshd_user_keys_pub_retrieve }}"
-
-- name: "[CA_User] Retrieve public key form private if pub key file doesn't exist"
-  shell: "ssh-keygen -y -f {{ item.priv_key }} > {{ item.pub_key }}"
-  with_items: "{{ sshd_user_keys_pub_retrieve }}"
-  delegate_to: localhost
-  when:
-    - true in sshd_user_keys_exist.values()
-    - not item.pub_exists
-#====== pub keys check start =======
-
-#===== certificate check start =====
-- name: "[CA_User] Create list of certificates setp 1: setting facts"
-  set_fact:
-    sshd_usr_c_item: "{{ item }}-cert.pub"
-  register: sshd_usr_c_result
-  with_items: "{{ sshd_user_uniq_keys }}"
-  when: true in sshd_user_keys_exist.values() # if no private keys exist, then they were generated with public keys
-
-- name: "[CA_User] Create list list of certificates setp 2: mapping facts to variable list"
-  set_fact:
-    sshd_user_uniq_certs:
-      "{{ sshd_usr_c_result.results | map(attribute='ansible_facts.sshd_usr_c_item') | list }}"
-  when: true in sshd_user_keys_exist.values()
-# This two actions are necessary because if the item does not exist, then results doesnt contain the 'path' key
-
-#- debug: msg="{{ sshd_user_uniq_certs }}"
-
-- name: "[CA_User] Locally check if user certificates already exist"
-  stat: path="{{ item }}"
-  register: sshd_user_certs
-  with_items: "{{ sshd_user_uniq_certs }}"
-  delegate_to: localhost
-  when: true in sshd_user_keys_exist.values()
-
-- name: "[CA_User] Combine the results into dictionary with following structure: { pub_key: value, cert: value, cert_exists: boolean }"
-  set_fact:
-    sshd_user_certs_exist:
-     "{{ sshd_user_certs_exist|default([]) + [{ 'pub_key': item[0], 'cert': item[1].item, 'cert_exists': item[1].stat.exists }] }}"
-  with_together:
-    - "{{ sshd_user_uniq_keys_pub }}"
-    - "{{ sshd_user_certs.results }}"
-  no_log: yes
-  when: true in sshd_user_keys_exist.values()
-
-- debug: msg="{{ sshd_user_certs_exist }}"
-
-- name: "[CA_User] Locally check the Signing CA fingerprint on user cert when user cert exist"
-  shell:
-    ssh-keygen -L -f {{ item.cert }} | \
-    fgrep "Signing CA" | sed 's/^[ \t]*//' | cut -d ' ' -f 4
-  become: yes           # TEMP
-  become_user: drew     # TEMP
-  delegate_to: localhost
-  register: sshd_user_certs_ca_fpr
-  changed_when: false
-  with_items: "{{ sshd_user_certs_exist }}"
-  when: item.cert_exists
-
-#- debug: msg="{{ sshd_user_certs_ca_fpr }}"
-
-- name: "[CA_User] Create a list of dictionaries for existing certs with following structure: { cert: value, cert_ca_fpr: value }"
-  set_fact:
-    sshd_user_certs_ca_fpr_stdout:
-      "{{ sshd_user_certs_ca_fpr_stdout|default([]) + [{'cert': item[1], 'cert_ca_fpr': item[0].stdout }] }}"
-  with_together:
-    - "{{ sshd_user_certs_ca_fpr.results }}"
-    - "{{ sshd_user_uniq_certs }}"
-  no_log: yes
-  when: "'stdout' in item[0]"
-
-- debug: msg="{{ sshd_user_certs_ca_fpr_stdout }}"
-  when: sshd_user_certs_ca_fpr_stdout is defined
-
-- name: "[CA_User] Locally check the User CA fingerprint only if any user certs already exist"
-  shell: ssh-keygen -l -f {{ sshd_user_ca }} | cut -d ' ' -f 2
+- name: "[CA_User] Locally cleanup old broken User CA key files"
+  file:
+    path: "{{ item.key }}"
+    state: absent
   become: yes
+  with_dict: "{{ sshd_user_ca_keys_exist }}"
   delegate_to: localhost
-  register: sshd_user_ca_fpr
-  changed_when: false
-  when: sshd_user_certs_ca_fpr_stdout is defined
+  when:
+    - false in sshd_user_ca_keys_exist.values()  # Cleanup only when key pair is broken
+    - item.value # Make it efficient: remove the key which exists, skip task for key which doesn't exist
 
-- debug: msg="{{ sshd_user_ca_fpr }}"
+- name: "[CA_User] Locally reate a User CA key"
+  shell: ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_user_ca }} -q -N {{ sshd_user_ca_pwd }}
+  delegate_to: localhost
+  register: sshd_user_ca_created
+  when: false in sshd_user_ca_keys_exist.values()
 
-#- name: "[CA_User] Sign the specified user public key with User CA"
-#  shell:
-#    ssh-keygen -s {{ sshd_user_ca }} -n {{ item[0].username }} -V +52w \
-#    -I {{ sshd_cert_id }}-{{ item[0].username }} {{ item[1].pub_key }}
-#  delegate_to: localhost
-#  with_together:
-#    - "{{ sshd_users }}"
-#    - "{{ sshd_user_certs_exist }}"
-#    - "{{ sshd_user_certs_ca_fpr }}"
-#  when:
-#    - item[1] == item[0].keypath
-#    - item[1].cert_exists == False or sshd_user_certs_ca_fpr.results.stdout != sshd_user_ca_fpr.stdout
+- name: "[CA_User] Copy User CA public key to sshd server"
+  copy:
+    src: "{{ sshd_user_ca }}.pub"
+    dest: "{{ sshd_cfg_dir }}"
+    mode: 0644
+    owner: root
+    group: "{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
+  become: yes
 ...
