@@ -45,13 +45,11 @@
     sshd_usr_k_item: "{{ item }}.pub"
   register: sshd_usr_k_result
   with_items: "{{ sshd_user_uniq_keys }}"
-  when: true in sshd_user_keys_exist.values() # if no private keys exist, then they were generated with public keys
 
 - name: "[CA_User] Create public key list setp 2: mapping facts to variable list"
   set_fact:
     sshd_user_uniq_keys_pub:
       "{{ sshd_usr_k_result.results | map(attribute='ansible_facts.sshd_usr_k_item') | list }}"
-  when: true in sshd_user_keys_exist.values()
 # This two actions are necessary because if the item does not exist, then results doesnt contain the 'path' key
 
 #- debug: msg="{{ sshd_user_uniq_keys_pub }}"
@@ -61,7 +59,7 @@
   register: sshd_user_keys_pub
   with_items: "{{ sshd_user_uniq_keys_pub }}"
   delegate_to: localhost
-  when: true in sshd_user_keys_exist.values()
+  when: true in sshd_user_keys_exist.values() # if no private keys exist, then they were generated with public keys
 
 - name: "[CA_User] Create the list of dictionaries with following structure: { priv_key: value, pub_key: value, pub_exists: boolean }"
   set_fact:
@@ -90,13 +88,11 @@
     sshd_usr_c_item: "{{ item }}-cert.pub"
   register: sshd_usr_c_result
   with_items: "{{ sshd_user_uniq_keys }}"
-  when: true in sshd_user_keys_exist.values() # if no private keys exist, then they were generated with public keys
 
 - name: "[CA_User] Create list list of certificates setp 2: mapping facts to variable list"
   set_fact:
     sshd_user_uniq_certs:
       "{{ sshd_usr_c_result.results | map(attribute='ansible_facts.sshd_usr_c_item') | list }}"
-  when: true in sshd_user_keys_exist.values()
 # This two actions are necessary because if the item does not exist, then results doesnt contain the 'path' key
 
 #- debug: msg="{{ sshd_user_uniq_certs }}"
@@ -106,7 +102,6 @@
   register: sshd_user_certs
   with_items: "{{ sshd_user_uniq_certs }}"
   delegate_to: localhost
-  when: true in sshd_user_keys_exist.values()
 
 - name: "[CA_User] Combine the results into dictionary with following structure: { pub_key: value, cert: value, cert_exists: boolean }"
   set_fact:
@@ -116,7 +111,6 @@
     - "{{ sshd_user_uniq_keys_pub }}"
     - "{{ sshd_user_certs.results }}"
   no_log: yes
-  when: true in sshd_user_keys_exist.values()
 
 #- debug: msg="{{ sshd_user_certs_exist }}"
 
@@ -130,7 +124,6 @@
   register: sshd_user_certs_ca_fpr
   changed_when: false
   with_items: "{{ sshd_user_certs_exist }}"
-  when: true in sshd_user_keys_exist.values()
 
 #- debug: msg="{{ sshd_user_certs_ca_fpr }}"
 
@@ -142,7 +135,6 @@
 #    - "{{ sshd_user_certs_exist }}"
 #    - "{{ sshd_user_certs_ca_fpr.results }}"
 
-
 - name: "[CA_User] Add cert_ca_fpr key with certificate fingerprints for existing certs into dictionaries: STEP 1, setting facts"
   set_fact:
     sshd_u_cert_fpr_tmp: "{{ [ item[0] | combine({'cert_ca_fpr': item[1].stdout}) ] }}"
@@ -151,45 +143,26 @@
     - "{{ sshd_user_certs_ca_fpr.results }}"
   register: sshd_user_certs_fprs
   no_log: yes
-  when: true in sshd_user_keys_exist.values()
 
 #- debug: msg="{{ sshd_u_cert_fpr_tmp }}"
 #- debug: msg="{{ sshd_user_certs_fprs.results }}"
 
-
 - name: "[CA_User] Add cert_ca_fpr key with certificate fingerprints for existing certs into dictionaries: STEP 2, modifying var"
   set_fact:
     sshd_user_certs_fprs: "{{ sshd_user_certs_fprs.results | map(attribute='ansible_facts.sshd_u_cert_fpr_tmp') | sum(start=[]) }}"
-  when: true in sshd_user_keys_exist.values()
 
-#- debug:
-#    msg: "{{ sshd_user_certs_fprs }}"
+#- debug: msg="{{ sshd_user_certs_fprs }}"
 
-#- name: "[CA_User] Create a list of dictionaries for existing certs with following structure: { cert: value, cert_ca_fpr: value }"
-#  set_fact:
-#    sshd_user_certs_ca_:
-#      "{{ sshd_user_certs_ca_fpr_stdout|default([]) + [{'cert': item[1], 'cert_ca_fpr': item[0].stdout }] }}"
-#  with_together:
-#    - "{{ sshd_user_certs_ca_fpr.results }}"
-#    - "{{ sshd_user_uniq_certs }}"
-#  no_log: yes
-#  when: "'stdout' in item[0]"
-#
-#- debug: msg="{{ sshd_user_certs_ca_fpr_stdout }}"
-#  when: sshd_user_certs_ca_fpr_stdout is defined
-#
 - name: "[CA_User] Locally check the User CA fingerprint only if any user certs already exist"
   shell: ssh-keygen -l -f {{ sshd_user_ca }} | cut -d ' ' -f 2
   become: yes
   delegate_to: localhost
   register: sshd_user_ca_fpr
   changed_when: false
-  when:
-    - true in sshd_user_keys_exist.values()
 
 #- debug: msg="{{ sshd_user_ca_fpr }}"
 
-- name: "[CA_User] Sign the specified user public key with User CA"
+- name: "[CA_User] Generate user certificates by signing the specified user public keys with User CA"
   shell:
     ssh-keygen -s {{ sshd_user_ca }} -n {{ item[0].username }} -V +52w \
     -I {{ sshd_cert_id }}-{{ item[0].username }} {{ item[1].pub_key }}
