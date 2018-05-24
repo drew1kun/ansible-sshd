@@ -22,17 +22,19 @@
   with_items: "{{ sshd_user_keys.results }}"
   no_log: yes
 
-#- debug:
-#    msg: "sshd_user_keys_exist: {{ sshd_user_keys_exist }}"
+- debug:
+    msg: "sshd_user_keys_exist: {{ sshd_user_keys_exist }}"
 
 - name: "[CA_User] Locally generate user key pairs if any private keys do not exist"
-  command: ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f /tmp/ssh_host_{{ sshd_algo }}_key
+  command: ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f {{ item.key }}
   #shell: echo "y" | ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f /tmp/ssh_host_{{ sshd_algo }}_key
   delegate_to: localhost
+  #become: yes
+  #become_user:
   with_dict: "{{ sshd_user_keys_exist }}"
   when:
     - false in sshd_user_keys_exist.values() # Do this task only if any private keys do not exist
-    - not item.key  # Create specific key pair only if private key doesn't exist
+    - not item.value  # Create specific key pair only if private key doesn't exist
 #======= priv keys check end =======
 
 #====== pub keys check start =======
@@ -116,9 +118,9 @@
   no_log: yes
   when: true in sshd_user_keys_exist.values()
 
-- debug: msg="{{ sshd_user_certs_exist }}"
+#- debug: msg="{{ sshd_user_certs_exist }}"
 
-- name: "[CA_User] Locally check the Signing CA fingerprint on user cert when user cert exist"
+- name: "[CA_User] Locally check the Signing CA fingerprint on user certs"
   shell:
     ssh-keygen -L -f {{ item.cert }} | \
     fgrep "Signing CA" | sed 's/^[ \t]*//' | cut -d ' ' -f 4
@@ -128,43 +130,74 @@
   register: sshd_user_certs_ca_fpr
   changed_when: false
   with_items: "{{ sshd_user_certs_exist }}"
-  when: item.cert_exists
+  when: true in sshd_user_keys_exist.values()
 
 #- debug: msg="{{ sshd_user_certs_ca_fpr }}"
 
-- name: "[CA_User] Create a list of dictionaries for existing certs with following structure: { cert: value, cert_ca_fpr: value }"
+#- debug:
+#    msg:
+#      - "sshd_user_certs_exist.item: {{ item[0] }}"
+#      - "sshd_user_certs_ca_fpr.results.item.stdout: {{ item[1].stdout }}"
+#  with_together:
+#    - "{{ sshd_user_certs_exist }}"
+#    - "{{ sshd_user_certs_ca_fpr.results }}"
+
+
+- name: "[CA_User] Add cert_ca_fpr key with certificate fingerprints for existing certs into dictionaries: STEP 1, setting facts"
   set_fact:
-    sshd_user_certs_ca_fpr_stdout:
-      "{{ sshd_user_certs_ca_fpr_stdout|default([]) + [{'cert': item[1], 'cert_ca_fpr': item[0].stdout }] }}"
+    sshd_u_cert_fpr_tmp: "{{ [ item[0] | combine({'cert_ca_fpr': item[1].stdout}) ] }}"
   with_together:
+    - "{{ sshd_user_certs_exist }}"
     - "{{ sshd_user_certs_ca_fpr.results }}"
-    - "{{ sshd_user_uniq_certs }}"
+  register: sshd_user_certs_fprs
   no_log: yes
-  when: "'stdout' in item[0]"
+  when: true in sshd_user_keys_exist.values()
 
-- debug: msg="{{ sshd_user_certs_ca_fpr_stdout }}"
-  when: sshd_user_certs_ca_fpr_stdout is defined
+#- debug: msg="{{ sshd_u_cert_fpr_tmp }}"
+#- debug: msg="{{ sshd_user_certs_fprs.results }}"
 
+
+- name: "[CA_User] Add cert_ca_fpr key with certificate fingerprints for existing certs into dictionaries: STEP 2, modifying var"
+  set_fact:
+    sshd_user_certs_fprs: "{{ sshd_user_certs_fprs.results | map(attribute='ansible_facts.sshd_u_cert_fpr_tmp') | sum(start=[]) }}"
+  when: true in sshd_user_keys_exist.values()
+
+#- debug:
+#    msg: "{{ sshd_user_certs_fprs }}"
+
+#- name: "[CA_User] Create a list of dictionaries for existing certs with following structure: { cert: value, cert_ca_fpr: value }"
+#  set_fact:
+#    sshd_user_certs_ca_:
+#      "{{ sshd_user_certs_ca_fpr_stdout|default([]) + [{'cert': item[1], 'cert_ca_fpr': item[0].stdout }] }}"
+#  with_together:
+#    - "{{ sshd_user_certs_ca_fpr.results }}"
+#    - "{{ sshd_user_uniq_certs }}"
+#  no_log: yes
+#  when: "'stdout' in item[0]"
+#
+#- debug: msg="{{ sshd_user_certs_ca_fpr_stdout }}"
+#  when: sshd_user_certs_ca_fpr_stdout is defined
+#
 - name: "[CA_User] Locally check the User CA fingerprint only if any user certs already exist"
   shell: ssh-keygen -l -f {{ sshd_user_ca }} | cut -d ' ' -f 2
   become: yes
   delegate_to: localhost
   register: sshd_user_ca_fpr
   changed_when: false
-  when: sshd_user_certs_ca_fpr_stdout is defined
+  when:
+    - true in sshd_user_keys_exist.values()
 
-- debug: msg="{{ sshd_user_ca_fpr }}"
+#- debug: msg="{{ sshd_user_ca_fpr }}"
 
-#- name: "[CA_User] Sign the specified user public key with User CA"
-#  shell:
-#    ssh-keygen -s {{ sshd_user_ca }} -n {{ item[0].username }} -V +52w \
-#    -I {{ sshd_cert_id }}-{{ item[0].username }} {{ item[1].pub_key }}
-#  delegate_to: localhost
-#  with_together:
-#    - "{{ sshd_users }}"
-#    - "{{ sshd_user_certs_exist }}"
-#    - "{{ sshd_user_certs_ca_fpr }}"
-#  when:
-#    - item[1] == item[0].keypath
-#    - item[1].cert_exists == False or sshd_user_certs_ca_fpr.results.stdout != sshd_user_ca_fpr.stdout
+- name: "[CA_User] Sign the specified user public key with User CA"
+  shell:
+    ssh-keygen -s {{ sshd_user_ca }} -n {{ item[0].username }} -V +52w \
+    -I {{ sshd_cert_id }}-{{ item[0].username }} {{ item[1].pub_key }}
+  delegate_to: localhost
+  with_together:
+    - "{{ sshd_users }}"
+    - "{{ sshd_user_certs_fprs }}"
+  when: item[1].cert_exists and item[1].cert_ca_fpr != sshd_user_ca_fpr.stdout or
+    not item[1].cert_exists or
+    not true in sshd_user_keys_exist.values()
 ...
