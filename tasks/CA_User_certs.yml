@@ -1,40 +1,48 @@
 ---
 # SIGN USER PUBLIC KEYS
 #======= priv keys check start =======
-#sshd_user_uniq_keys
 - name: "[CA_User] Get list of uniqe ssh keys for all users to be signed with User CA"
   set_fact:
     sshd_user_uniq_keys: "{{ sshd_users|map(attribute='keypath')|list|unique }}"  # LIST OF UNIQ KEYS
     with_items: "{{ sshd_users }}"
   no_log: yes
 
-#- debug: msg="{{ sshd_user_uniq_keys }}"
-
 - name: "[CA_User] Locally check if user private keys already exist"
   stat: path="{{ item }}"
-  register: sshd_user_keys
+  register: sshd_user_k
   with_items: "{{ sshd_user_uniq_keys }}"
   delegate_to: localhost
 
-- name: "[CA_User] Combine the results into dictionary with following structure: {<user_key> : <stat.exists>"
+- name: "[CA_User] Combine the results into dictionary with following structure: {<user_priv_key> : <stat.exists>"
   set_fact:
-    sshd_user_keys_exist: "{{ sshd_user_keys_exist|default({}) | combine( {item.item: item.stat.exists} ) }}"
-  with_items: "{{ sshd_user_keys.results }}"
+    sshd_user_keys: "{{ sshd_user_keys|default([]) + [{ 'priv_key': item.item, 'priv_exists': item.stat.exists }] }}"
+  with_items: "{{ sshd_user_k.results }}"
   no_log: yes
 
-- debug:
-    msg: "sshd_user_keys_exist: {{ sshd_user_keys_exist }}"
-
 - name: "[CA_User] Locally generate user key pairs if any private keys do not exist"
-  command: ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f {{ item.key }}
-  #shell: echo "y" | ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f /tmp/ssh_host_{{ sshd_algo }}_key
+  command: ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f {{ item.priv_key }}
   delegate_to: localhost
   #become: yes
   #become_user:
-  with_dict: "{{ sshd_user_keys_exist }}"
+  with_items: "{{ sshd_user_keys }}"
   when:
-    - false in sshd_user_keys_exist.values() # Do this task only if any private keys do not exist
-    - not item.value  # Create specific key pair only if private key doesn't exist
+    - not item.priv_exists  # Create specific key pair only if private key doesn't exist
+
+- name: "[CA_User] Cleanup: locally remove all .pub keys which do not have private part"
+  file:
+    path: "{{ item.priv_key }}.pub"
+    state: absent
+  delegate_to: localhost
+  with_items: "{{ sshd_user_keys }}"
+  when: not item.priv_exists  # Create specific key pair only if private key doesn't exist
+
+- name: "[CA_User] Locally register the private keys' fingerprints"
+  shell: ssh-keygen -l -f {{ item.priv_key }} | cut -d ' ' -f 2
+  register: sshd_user_k_fprs
+  delegate_to: localhost
+  with_items: "{{ sshd_user_keys }}"
+  changed_when: false
+  #when: item.priv_exists
 #======= priv keys check end =======
 
 #====== pub keys check start =======
@@ -48,110 +56,126 @@
 
 - name: "[CA_User] Create public key list setp 2: mapping facts to variable list"
   set_fact:
-    sshd_user_uniq_keys_pub:
+    sshd_user_k_pub:
       "{{ sshd_usr_k_result.results | map(attribute='ansible_facts.sshd_usr_k_item') | list }}"
 # This two actions are necessary because if the item does not exist, then results doesnt contain the 'path' key
 
-#- debug: msg="{{ sshd_user_uniq_keys_pub }}"
+# Checking fprs on pub keys unconditionally. if pub key doesn't exist, stdout will be registered as ''
+- name: "[CA_User] Locally check the public keys' fingerprints"
+  shell: ssh-keygen -l -f {{ item }}  | cut -d ' ' -f 2
+  register: sshd_user_k_pub_fprs
+  delegate_to: localhost
+  changed_when: false
+  with_items: "{{ sshd_user_k_pub }}"
+  #when: item.priv_exists
+
+#- debug: msg="{{ sshd_user_k_pub_fprs.results }}"
 
 - name: "[CA_User] Locally check if user pub keys already exist"
   stat: path="{{ item }}"
-  register: sshd_user_keys_pub
-  with_items: "{{ sshd_user_uniq_keys_pub }}"
+  register: sshd_user_k_pub_exist
+  with_items: "{{ sshd_user_k_pub }}"
   delegate_to: localhost
-  when: true in sshd_user_keys_exist.values() # if no private keys exist, then they were generated with public keys
+#  when: item.priv_exists
 
-- name: "[CA_User] Create the list of dictionaries with following structure: { priv_key: value, pub_key: value, pub_exists: boolean }"
+#- debug: msg="{{ sshd_user_k_pub_exists.results }}"
+
+- name: "[CA_User] Add pub and priv keys' fingerprints and pub key names and existence status: STEP 1, register results"
   set_fact:
-    sshd_user_keys_pub_retrieve:
-      "{{ sshd_user_keys_pub_retrieve|default([]) + [{ 'priv_key': item[0], 'pub_key': item[1].item, 'pub_exists': item[1].stat.exists }] }}"
+    sshd_user_k_pub_tmp:
+      "{{ [ item[0]|combine({'pub_key': item[1], 'pub_exists': item[2].stat.exists, 'pub_fpr': item[3].stdout, 'priv_fpr': item[4].stdout}) ] }}"
   with_together:
-    - "{{ sshd_user_uniq_keys }}"
-    - "{{ sshd_user_keys_pub.results }}"
+    - "{{ sshd_user_keys }}"
+    - "{{ sshd_user_k_pub }}"
+    - "{{ sshd_user_k_pub_exist.results }}"
+    - "{{ sshd_user_k_pub_fprs.results }}"
+    - "{{ sshd_user_k_fprs.results }}"
+  register: sshd_user_k_pub
   no_log: yes
-  when: true in sshd_user_keys_exist.values()
+  #when: item[0].priv_exists
 
-#- debug: msg="{{ sshd_user_keys_pub_retrieve }}"
+- name: "[CA_User] Add pub and priv keys' fingerprints and pub key names and existence status: STEP 2, modifying var"
+  set_fact:
+    sshd_user_keys:
+      "{{ sshd_user_k_pub.results | map(attribute='ansible_facts.sshd_user_k_pub_tmp') | sum(start=[]) }}"
 
-- name: "[CA_User] Retrieve public key form private if pub key file doesn't exist"
-  shell: "ssh-keygen -y -f {{ item.priv_key }} > {{ item.pub_key }}"
-  with_items: "{{ sshd_user_keys_pub_retrieve }}"
+#- debug: msg="{{ sshd_user_keys }}"
+
+# This check is for cases when private key is absent but public key exists or broken
+- name: "[CA_User] Locally Remove public key file if it's fingerprint doesn't match the private key's one"
+  file:
+    path: "{{ item.pub_key }}"
+    state: absent
+  with_items: "{{ sshd_user_keys }}"
   delegate_to: localhost
   when:
-    - true in sshd_user_keys_exist.values()
-    - not item.pub_exists
+    - item.priv_exists and item.pub_exists
+    - item.priv_fpr != item.pub_fpr
+
+- name: "[CA_User] Locally retrieve public key form private if pub key file doesn't exist"
+  shell: "ssh-keygen -y -f {{ item.priv_key }} > {{ item.pub_key }}"
+  with_items: "{{ sshd_user_keys }}"
+  delegate_to: localhost
+  when:
+    - not item.pub_exists or item.pub_exists and item.priv_fpr != item.pub_fpr
 #====== pub keys check start =======
 
 #===== certificate check start =====
 - name: "[CA_User] Create list of certificates setp 1: setting facts"
   set_fact:
-    sshd_usr_c_item: "{{ item }}-cert.pub"
-  register: sshd_usr_c_result
+    sshd_user_c_item: "{{ item }}-cert.pub"
+  register: sshd_user_c_result
   with_items: "{{ sshd_user_uniq_keys }}"
 
 - name: "[CA_User] Create list list of certificates setp 2: mapping facts to variable list"
   set_fact:
-    sshd_user_uniq_certs:
-      "{{ sshd_usr_c_result.results | map(attribute='ansible_facts.sshd_usr_c_item') | list }}"
+    sshd_user_certs:
+      "{{ sshd_user_c_result.results | map(attribute='ansible_facts.sshd_user_c_item') | list }}"
 # This two actions are necessary because if the item does not exist, then results doesnt contain the 'path' key
-
-#- debug: msg="{{ sshd_user_uniq_certs }}"
 
 - name: "[CA_User] Locally check if user certificates already exist"
   stat: path="{{ item }}"
-  register: sshd_user_certs
-  with_items: "{{ sshd_user_uniq_certs }}"
+  register: sshd_user_c_exist
+  with_items: "{{ sshd_user_certs }}"
   delegate_to: localhost
 
-- name: "[CA_User] Combine the results into dictionary with following structure: { pub_key: value, cert: value, cert_exists: boolean }"
-  set_fact:
-    sshd_user_certs_exist:
-     "{{ sshd_user_certs_exist|default([]) + [{ 'pub_key': item[0], 'cert': item[1].item, 'cert_exists': item[1].stat.exists }] }}"
-  with_together:
-    - "{{ sshd_user_uniq_keys_pub }}"
-    - "{{ sshd_user_certs.results }}"
-  no_log: yes
-
-#- debug: msg="{{ sshd_user_certs_exist }}"
+- name: "[CA_User] Locally check the user ca fingerprints"
+  shell:
+    ssh-keygen -L -f {{ item }} | \
+    fgrep "Public key" | sed 's/^[ \t]*//' | cut -d ' ' -f 4
+  become: yes           # TEMP
+  become_user: drew     # TEMP
+  delegate_to: localhost
+  register: sshd_user_c_fprs
+  changed_when: false
+  with_items: "{{ sshd_user_certs }}"
 
 - name: "[CA_User] Locally check the Signing CA fingerprint on user certs"
   shell:
-    ssh-keygen -L -f {{ item.cert }} | \
+    ssh-keygen -L -f {{ item }} | \
     fgrep "Signing CA" | sed 's/^[ \t]*//' | cut -d ' ' -f 4
   become: yes           # TEMP
   become_user: drew     # TEMP
   delegate_to: localhost
-  register: sshd_user_certs_ca_fpr
+  register: sshd_user_c_ca_fprs
   changed_when: false
-  with_items: "{{ sshd_user_certs_exist }}"
-
-#- debug: msg="{{ sshd_user_certs_ca_fpr }}"
-
-#- debug:
-#    msg:
-#      - "sshd_user_certs_exist.item: {{ item[0] }}"
-#      - "sshd_user_certs_ca_fpr.results.item.stdout: {{ item[1].stdout }}"
-#  with_together:
-#    - "{{ sshd_user_certs_exist }}"
-#    - "{{ sshd_user_certs_ca_fpr.results }}"
+  with_items: "{{ sshd_user_certs }}"
 
 - name: "[CA_User] Add cert_ca_fpr key with certificate fingerprints for existing certs into dictionaries: STEP 1, setting facts"
   set_fact:
-    sshd_u_cert_fpr_tmp: "{{ [ item[0] | combine({'cert_ca_fpr': item[1].stdout}) ] }}"
+    sshd_user_c_tmp: "{{[item[0]|combine({'cert': item[1], 'cert_exists': item[2].stat.exists, 'cert_fpr': item[3].stdout, 'cert_ca_fpr': item[4].stdout})]}}"
   with_together:
-    - "{{ sshd_user_certs_exist }}"
-    - "{{ sshd_user_certs_ca_fpr.results }}"
-  register: sshd_user_certs_fprs
+    - "{{ sshd_user_keys }}"
+    - "{{ sshd_user_certs }}"
+    - "{{ sshd_user_c_exist.results }}"
+    - "{{ sshd_user_c_fprs.results }}"
+    - "{{ sshd_user_c_ca_fprs.results }}"
+  register: sshd_user_c
   no_log: yes
-
-#- debug: msg="{{ sshd_u_cert_fpr_tmp }}"
-#- debug: msg="{{ sshd_user_certs_fprs.results }}"
 
 - name: "[CA_User] Add cert_ca_fpr key with certificate fingerprints for existing certs into dictionaries: STEP 2, modifying var"
   set_fact:
-    sshd_user_certs_fprs: "{{ sshd_user_certs_fprs.results | map(attribute='ansible_facts.sshd_u_cert_fpr_tmp') | sum(start=[]) }}"
-
-#- debug: msg="{{ sshd_user_certs_fprs }}"
+    sshd_user_keys: "{{ sshd_user_c.results | map(attribute='ansible_facts.sshd_user_c_tmp') | sum(start=[]) }}"
 
 - name: "[CA_User] Locally check the User CA fingerprint only if any user certs already exist"
   shell: ssh-keygen -l -f {{ sshd_user_ca }} | cut -d ' ' -f 2
@@ -160,17 +184,26 @@
   register: sshd_user_ca_fpr
   changed_when: false
 
-#- debug: msg="{{ sshd_user_ca_fpr }}"
+# This check is for cases when cert file exists but broken or issued for different public key
+- name: "[CA_User] Locally Remove certificate file if it's fingerprint doesn't match the public key's one"
+  file:
+    path: "{{ item.cert }}"
+    state: absent
+  with_items: "{{ sshd_user_keys }}"
+  delegate_to: localhost
+  when:
+    - item.cert_exists
+    - item.cert_fpr != item.pub_fpr
 
-- name: "[CA_User] Generate user certificates by signing the specified user public keys with User CA"
+- name: "[CA_User] Locally generate user certificates by signing the specified user public keys with User CA"
   shell:
     ssh-keygen -s {{ sshd_user_ca }} -n {{ item[0].username }} -V +52w \
     -I {{ sshd_cert_id }}-{{ item[0].username }} {{ item[1].pub_key }}
   delegate_to: localhost
   with_together:
     - "{{ sshd_users }}"
-    - "{{ sshd_user_certs_fprs }}"
+    - "{{ sshd_user_keys }}"
   when: item[1].cert_exists and item[1].cert_ca_fpr != sshd_user_ca_fpr.stdout or
     not item[1].cert_exists or
-    not true in sshd_user_keys_exist.values()
+    not item[1].priv_exists
 ...

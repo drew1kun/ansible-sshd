@@ -16,12 +16,12 @@ sshd_port: 22
 sshd_users:
   - username: "{{ ansible_user_id }}"
     key: "{{ lookup('file', 'pub_keys/id_ed25519.pub') }}" # Key to be used if NOT using certificate setup (sshd_certs: no)
-    keypath: ~/.ssh/id_{{ sshd_algo }} # Path to user private key to be signed with User CA. Will be created if needed.
+    keypath: /Users/drew/.ssh/id_{{ sshd_algo }} # Local path to user private key to be signed with User CA. Will be created if needed.
     comment:
 
   - username: drew
     key: "{{ lookup('file', 'pub_keys/id_ed25519.pub') }}" # Key to be used if NOT using certificate setup (sshd_certs: no)
-    keypath: ~/.ssh/id_rsa # Path to user private key to be signed with User CA. If key doesn't exist it will be created
+    keypath: /Users/drew/.ssh/id_rsa # Local path to user private key to be signed with User CA. Will be created if needed
     comment:
 
 sshd_root_login: no   # yes | no; No - recommended
