@@ -47,7 +47,7 @@
     state: present
     key: "{{ item.key }}"
     comment: "{{ item.comment }}"
-  become: yes   # this module required for this module; 'become_user: item' won't work
+  become: yes   # required for this module; 'become_user: item' won't work
   with_items: "{{ sshd_users | unique }}"
   when: not sshd_certs
   notify: Restart sshd

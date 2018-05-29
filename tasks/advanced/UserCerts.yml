@@ -1,0 +1,197 @@
+---
+# SIGN USER PUBLIC KEYS
+#======= priv keys check start =======
+- name: "[UserCerts] Get list of uniqe ssh keys for all users to be signed with User CA"
+  set_fact:
+    sshd_user_uniq_keys: "{{ sshd_users|map(attribute='keypath')|list|unique }}"
+    with_items: "{{ sshd_users }}"
+  no_log: yes
+
+- name: "[UserCerts] Locally check if user private keys already exist"
+  stat: path="{{ item }}"
+  register: sshd_user_k
+  with_items: "{{ sshd_user_uniq_keys }}"
+  delegate_to: localhost
+
+- name: "[UserCerts] Combine the results into following structure: [{priv_key:value,priv_exists:bool}]"
+  set_fact:
+    sshd_user_keys: "{{ sshd_user_keys|default([]) + [{'priv_key': item.item, 'priv_exists': item.stat.exists}] }}"
+  with_items: "{{ sshd_user_k.results }}"
+  no_log: yes
+
+- name: "[UserCerts] Cleanup: locally remove all .pub keys which do not have private part"
+  file: path="{{ item.priv_key }}.pub" state=absent
+  delegate_to: localhost
+  with_items: "{{ sshd_user_keys }}"
+  when: not item.priv_exists
+
+- name: "[UserCerts] Locally generate user key pairs if any private keys do not exist"
+  command: ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f {{ item.priv_key }}
+  delegate_to: localhost
+  #become: yes
+  with_items: "{{ sshd_user_keys }}"
+  when: not item.priv_exists  # Create specific key pair only if private key doesn't exist
+
+# Check fprs unconditionally to save the order and structure of registered results.
+# If pub key doesn't exist, stdout will be registered as '' because stderr is an output.
+- name: "[UserCerts] Locally register the private keys' fingerprints"
+  shell: ssh-keygen -l -E SHA512 -f {{ item.priv_key }} | cut -d ' ' -f 2
+  register: sshd_user_k_fprs
+  delegate_to: localhost
+  with_items: "{{ sshd_user_keys }}"
+  changed_when: false
+#======= priv keys check end =======
+
+#====== pub keys check start =======
+# IF it is necessary to dynamically create a variable containing specific data:
+# https://stackoverflow.com/questions/29399581/using-set-facts-and-with-items-together-in-ansible#29817564
+- name: "[UserCerts] Create public key list setp 1: setting facts"
+  set_fact:
+    sshd_usr_k_item: "{{ item }}.pub"
+  register: sshd_usr_k_result
+  with_items: "{{ sshd_user_uniq_keys }}"
+
+- name: "[UserCerts] Create public key list setp 2: mapping facts to variable list"
+  set_fact:
+    sshd_user_k_pub:
+      "{{ sshd_usr_k_result.results|map(attribute='ansible_facts.sshd_usr_k_item')|list }}"
+# This two actions are necessary because if the item does not exist, then results doesnt contain the 'path' key
+
+- name: "[UserCerts] Locally check if user pub keys already exist"
+  stat: path="{{ item }}"
+  register: sshd_user_k_pub_exist
+  with_items: "{{ sshd_user_k_pub }}"
+  delegate_to: localhost
+#  when: item.priv_exists
+
+#- debug: msg="{{ sshd_user_k_pub_exists.results }}"
+
+- name: "[UserCerts] Locally check the public keys' fingerprints"
+  shell: ssh-keygen -l -f {{ item }} -E SHA512 | cut -d ' ' -f 2
+  register: sshd_user_k_pub_fprs
+  delegate_to: localhost
+  changed_when: false
+  with_items: "{{ sshd_user_k_pub }}"
+  #when: item.priv_exists
+
+#- debug: msg="{{ sshd_user_k_pub_fprs.results }}"
+
+- name: "[UserCerts] Add pub and priv keys' fingerprints and pub key names and existence status: STEP 1, register results"
+  set_fact:
+    sshd_user_k_pub_tmp:
+      "{{ [ item[0]|combine({'pub_key': item[1], 'pub_exists': item[2].stat.exists,
+        'pub_fpr': item[3].stdout, 'priv_fpr': item[4].stdout}) ] }}"
+  with_together:
+    - "{{ sshd_user_keys }}"
+    - "{{ sshd_user_k_pub }}"
+    - "{{ sshd_user_k_pub_exist.results }}"
+    - "{{ sshd_user_k_pub_fprs.results }}"
+    - "{{ sshd_user_k_fprs.results }}"
+  register: sshd_user_k_pub
+  no_log: yes
+  #when: item[0].priv_exists
+
+- name: "[UserCerts] Add pub and priv keys' fingerprints and pub key names and existence status: STEP 2, modifying var"
+  set_fact:
+    sshd_user_keys:
+      "{{ sshd_user_k_pub.results|map(attribute='ansible_facts.sshd_user_k_pub_tmp')|sum(start=[]) }}"
+
+# This check is for cases when private key is absent but public key exists or broken
+- name: "[UserCerts] Locally remove public key file if it's fingerprint doesn't match the private key's one"
+  file:
+    path: "{{ item.pub_key }}"
+    state: absent
+  with_items: "{{ sshd_user_keys }}"
+  delegate_to: localhost
+  when:
+    - item.priv_exists and item.pub_exists
+    - item.priv_fpr != item.pub_fpr
+
+- name: "[UserCerts] Locally retrieve public key form private if pub key file doesn't exist"
+  shell: "ssh-keygen -y -f {{ item.priv_key }} > {{ item.pub_key }}"
+  with_items: "{{ sshd_user_keys }}"
+  delegate_to: localhost
+  when:
+    - not item.pub_exists or item.pub_exists and item.priv_fpr != item.pub_fpr
+#====== pub keys check start =======
+
+#===== certificate check start =====
+- name: "[UserCerts] Create list of certificates setp 1: setting facts"
+  set_fact:
+    sshd_user_c_item: "{{ item }}-cert.pub"
+  register: sshd_user_c_result
+  with_items: "{{ sshd_user_uniq_keys }}"
+
+- name: "[UserCerts] Create list list of certificates setp 2: mapping facts to variable list"
+  set_fact:
+    sshd_user_certs:
+      "{{ sshd_user_c_result.results|map(attribute='ansible_facts.sshd_user_c_item')|list }}"
+# This two actions are necessary because if the item does not exist, then results doesnt contain the 'path' key
+
+- name: "[UserCerts] Locally check if user certificates already exist"
+  stat: path="{{ item }}"
+  register: sshd_user_c_exist
+  with_items: "{{ sshd_user_certs }}"
+  delegate_to: localhost
+
+- name: "[UserCerts] Locally check the user ca fingerprints"
+  shell:
+    ssh-keygen -L -E SHA512 -f {{ item }} | \
+    fgrep "Public key" | sed 's/^[ \t]*//' | cut -d ' ' -f 4
+  become: yes           # TEMP
+  become_user: drew     # TEMP
+  delegate_to: localhost
+  register: sshd_user_c_fprs
+  changed_when: false
+  with_items: "{{ sshd_user_certs }}"
+
+- name: "[UserCerts] Locally check the Signing CA fingerprint on user certs"
+  shell:
+    ssh-keygen -L -E SHA512 -f {{ item }} | \
+    fgrep "Signing CA" | sed 's/^[ \t]*//' | cut -d ' ' -f 4
+  become: yes           # TEMP
+  become_user: drew     # TEMP
+  delegate_to: localhost
+  register: sshd_user_c_ca_fprs
+  changed_when: false
+  with_items: "{{ sshd_user_certs }}"
+
+- name: "[UserCerts] Add cert_ca_fpr key with certificate fingerprints for existing certs into dictionaries: STEP 1, setting facts"
+  set_fact:
+    sshd_user_c_tmp:
+      "{{[item[0]|combine({'cert': item[1], 'cert_exists': item[2].stat.exists,
+        'cert_fpr': item[3].stdout, 'cert_ca_fpr': item[4].stdout})]}}"
+  with_together:
+    - "{{ sshd_user_keys }}"
+    - "{{ sshd_user_certs }}"
+    - "{{ sshd_user_c_exist.results }}"
+    - "{{ sshd_user_c_fprs.results }}"
+    - "{{ sshd_user_c_ca_fprs.results }}"
+  register: sshd_user_c
+  no_log: yes
+
+- name: "[UserCerts] Add cert_ca_fpr key with certificate fingerprints for existing certs into dictionaries: STEP 2, modifying var"
+  set_fact:
+    sshd_user_keys: "{{ sshd_user_c.results|map(attribute='ansible_facts.sshd_user_c_tmp')|sum(start=[]) }}"
+
+# This check is for cases when cert file exists but broken or issued for different public key
+- name: "[UserCerts] Cleanup: locally Remove certificate file if it's fingerprint doesn't match the public key's one"
+  file: path="{{ item.cert }}" state=absent
+  register: sshd_user_certs_removed  # register the cert file deletion fact
+  with_items: "{{ sshd_user_keys }}"
+  delegate_to: localhost
+  no_log: yes
+  when: not item.priv_exists or
+        item.cert_ca_fpr != sshd_user_ca_fpr.stdout or
+        item.cert_fpr != item.priv_fpr # Compare with priv_fpr instead of pub on purpose
+
+- name: "[UserCerts] Locally generate user certificates by signing the specified user public keys with User CA"
+  shell:
+    ssh-keygen -s {{ sshd_user_ca_key }} -n {{ item[0].username }} -V +52w \
+    -I {{ sshd_cert_id }}-{{ item[0].username }} {{ item[1].pub_key }}
+  delegate_to: localhost
+  become: yes
+  with_together: ["{{ sshd_users }}", "{{ sshd_user_keys }}", "{{ sshd_user_certs_removed.results }}"]
+  no_log: yes
+  when: item[2].changed or not item[1].cert_exists
+...

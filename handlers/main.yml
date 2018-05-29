@@ -1,6 +1,28 @@
 ---
 # handlers file for ansible-sshd
 
+- name: Generated Host CA info
+  debug:
+    msg:
+      - "NOTE: The new Host CA keypair was generated on local machine"
+      - "The key fingerprint is:"
+      - "        {{ sshd_host_ca_fpr.stdout }}"
+      - "The Host CA private key is saved as:"
+      - "        {{ sshd_host_ca_key }}"
+      - "Please back up this Host CA file and keep it in the secure place"
+      - "NOTE: the new CA private key is not encrypted (doesn't have a passphrase)"
+
+- name: Generated User CA info
+  debug:
+    msg:
+      - "NOTE: The new User CA keypair was generated on local machine"
+      - "The key fingerprint is:"
+      - "        {{ sshd_user_ca_fpr.stdout }}"
+      - "The User CA private key is saved as:"
+      - "        {{ sshd_user_ca_key }}"
+      - "Please back up this User CA file and keep it in the secure place"
+      - "NOTE: the new CA private key is not encrypted (doesn't have a passphrase)"
+
 # Linux (SysV, systemd), FreeBSD (BSD init)
 - name: Restart sshd service
   service: name=sshd state=restarted

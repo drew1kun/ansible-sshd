@@ -6,43 +6,27 @@
 #  when: ansible_os_family == 'Darwin'
 #  tags:
 #    - sshd
-#
+
 #- name: '[main] Include Host CA tasks if using SSH Certificates for hardening setup'
-#  include_tasks: CA_Host.yml
-#  when: sshd_certs
-#  tags:
-#    - sshd
-
-#- name: "[setup] Generate secure {{ sshd_cfg_dir }}/sshd_config"
-#  template:
-#    src: sshd_config.j2
-#    dest: "{{ sshd_cfg_dir }}/sshd_config"
-#    backup: yes
-#    owner: root
-#    group: "{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
-#    mode: 0600
-#  become: yes
-#  #when: ansible_os_family != 'Darwin' or ansible_os_family == 'Darwin' and ansible_distribution_version.startswith('10.12')
-#  notify: Restart sshd
-#  tags:
-#    - sshd
-
-#- name: '[main] Include User CA tasks if using SSH Certificates for hardening setup'
-#  include_tasks: CA_User.yml
+#  include_tasks: advanced/HostCA.yml
 #  when: sshd_certs
 #  tags:
 #    - sshd
 
 - name: '[main] Include User CA tasks if using SSH Certificates for hardening setup'
-  include_tasks: CA_User_certs.yml
+  include_tasks: advanced/UserCA.yml
   when: sshd_certs
   tags:
     - sshd
 
+- name: '[main] Include User CA tasks if using SSH Certificates for hardening setup'
+  include_tasks: advanced/UserCerts.yml
+  when: sshd_certs
+  tags:
+    - sshd
 
-#- name: '[main] Include tasks for sshd setup'
-#  include_tasks: setup.yml
-#  tags:
-#    - sshd
-
+- name: '[main] Include tasks for sshd setup'
+  include_tasks: setup.yml
+  tags:
+    - sshd
 ...
