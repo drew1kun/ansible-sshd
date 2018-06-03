@@ -4,7 +4,42 @@ Ansible role: sshd
 [![MIT licensed][mit-badge]][mit-link]
 [![Galaxy Role][role-badge]][galaxy-link]
 
-Cross-platform ansible role for hardening ssh daemon configuration
+Cross-platform ansible role for hardening ssh daemon configuration using PKI and certificates
+
+The role does the following:
+
+ - Adds the specified user ssh public keys to ssh server's authorized hosts
+ - Creates secure sshd_cofnig which adds a bunch of security tweaks like disable password authentication, root login,
+    enable pki authentication and only allow users, which are specified in `sshd_users`. See deatials in
+    [*templates/sshd_config.j2*](templates/sshd_config.j2)
+
+**Certifiacte Setup:**
+
+The following will be done when variable `sshd_certs` set to `yes` (default):
+
+ - The role will create all keypairs, retrieve any public keys from their private portions and generate necessary
+    certificates only if needed (complete idempotency). If you have any keys you want to use (user private keys, Host or User
+    CA private keys) just specify them in corresponding variables.
+ - It will look for HostCA and UserCA set in `sshd_host_ca_key` and `sshd_user_ca_key` and if the files are not there, then
+    they will be generated using `sshd_algo` algorithm.
+ - The host keys encrypted with `sshd_algo` algorithm will be generated and signed with HostCA if they are not already
+    there.
+ - The specified user keys will be generated (again - only if needed) for each of specified user (var `sshd_users`) and
+    signed with UserCA.
+ - The local machine (ansible control host) will be configured to trust all host keys signed with specified Host CA
+    (so no more annoying host keys fingerprint verifications - all guaranteed with SSH trusted Host CA)
+ - The remote ssh server (ansible managed host) will be configured to trust all user keys signed with specified User CA
+
+NOTE: For security reasons the User and Host CA fingerprint crosscheck is implemented, so if you are using your old CA
+keys, make sure you have specified the correct full path to their private keys (`sshd_host_ca_key` and `sshd_user_ca_key`)
+and their fingerprints as **SHA512** (`sshd_host_ca_key_fpr` and `sshd_user_ca_key_fpr`) hashes. You just need private
+keys. Public keys will be retrieved from the private keys of specified CA automatically if it exists.
+If there is no specific User or Host CA you want to use, then you need  the specified files will be created automatically.
+
+To provide complete non-interactivness User and Host CA private key files will be UNENCRYPTED () so please back up them
+and store in a secure place (like KeepassXC db etc..). By default the files will be stored in **/etc/ssh/** (or in
+**/etc** for MacOS 10.12 or earlier), owned by root and protected by Unix permissions. The corresponding notifications
+wil pop up upon successful role execution.
 
 Requirements
 ------------
@@ -44,9 +79,26 @@ Role Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| **sshd_algo** | Algorithm for SSH keys and CAs, which will be generated if there none already exist | `ed25519` |
 | **sshd_port** | Port ssh daemon to listen on | `22` |
-| **sshd_users[]** | List of users to configure ssh keys for and allow in etc/sshd_config | see [`defaults/main.yml`](defaults/main.yml) |
+| **sshd_users: []** | List of users to configure ssh keys for and allow in etc/sshd_config | see [`defaults/main.yml`](defaults/main.yml) |
 | **sshd_root_login** | Allow ssh root login? No - recommended. If yes - then only passwordless (pubkey) root login will be configured | `no` |
+
+
+**Certifiacte Setup Variables:**
+| Variable | Description | Default |
+|----------|-------------|---------|
+| **sshd_certs** | Harden sshd config using Host and User certificates | `yes` |
+| **sshd_host_ca_key_fpr** | Host CA fingerprint for cross check |
+`SHA512:JW9LfG8wfWkPhQZ4n3ljYKijKpOH/oNuJYjtKbzHvWkjrqseTdobkOskjqAHqj8WAfpCkmOp/d1buSyHkK+Ipw` |
+| **sshd_user_ca_key_fpr** | User CA fingerprint for cross check |
+`SHA512:UwXpDQfzlsX1H6RNTZd1xDgoOe4X/SzvGSD9H2r8gAnn4+/ZuBDnqNp4guasNnESYEzUdV2kmgOiFwpQ5NCtBQ` |
+| **sshd_host_ca_key** | Full path to Host CA | `"{{ sshd_cfg_dir }}/id_{{ sshd_algo }}-HostCA"` |
+| **sshd_user_ca_key** | Full path to User CA | `"{{ sshd_cfg_dir }}/id_{{ sshd_algo }}-UserCA"` |
+| **sshd_host_ca_comment** | Full path to User CA | `"{{ sshd_cfg_dir }}/id_{{ sshd_algo }}-UserCA"` |
+| **sshd_user_ca_comment** | Full path to User CA | `"{{ sshd_cfg_dir }}/id_{{ sshd_algo }}-UserCA"` |
+| **sshd_cert_id** | Host Identifier, used in Logging and Revoking the Certificate | `domain.local` |
+| **sshd_certlogger** | The log file that holds the certificate signing facts | `/usr/local/var/log/cert-signing.log` |
 
 MacOS-Specific:
 
