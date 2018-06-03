@@ -8,7 +8,7 @@ Cross-platform ansible role for hardening ssh daemon configuration using PKI and
 
 The role does the following:
 
- - Adds the specified user ssh public keys to ssh server's authorized hosts
+ - Adds the specified user ssh public keys to ssh server's authorized hosts file, if no certificate setup is used         (`sshd_certs` set to `no`).
  - Creates secure sshd_cofnig which adds a bunch of security tweaks like disable password authentication, root login,
     enable pki authentication and only allow users, which are specified in `sshd_users`. See deatials in
     [*templates/sshd_config.j2*](templates/sshd_config.j2)
@@ -37,8 +37,8 @@ keys. Public keys will be retrieved from the private keys of specified CA automa
 If there is no specific User or Host CA you want to use, then you need  the specified files will be created automatically.
 
 To provide complete non-interactivness User and Host CA private key files will be UNENCRYPTED () so please back up them
-and store in a secure place (like KeepassXC db etc..). By default the files will be stored in **/etc/ssh/** (or in
-**/etc** for MacOS 10.12 or earlier), owned by root and protected by Unix permissions. The corresponding notifications
+and store in a secure place (like [KeepassXC][keepass] db etc..). By default the files will be stored in */etc/ssh/* (or in
+*/etc* for MacOS 10.12 or earlier), owned by root and protected by Unix permissions. The corresponding notifications
 wil pop up upon successful role execution.
 
 Requirements
@@ -86,13 +86,12 @@ Role Variables
 
 
 **Certifiacte Setup Variables:**
+
 | Variable | Description | Default |
 |----------|-------------|---------|
 | **sshd_certs** | Harden sshd config using Host and User certificates | `yes` |
-| **sshd_host_ca_key_fpr** | Host CA fingerprint for cross check |
-`SHA512:JW9LfG8wfWkPhQZ4n3ljYKijKpOH/oNuJYjtKbzHvWkjrqseTdobkOskjqAHqj8WAfpCkmOp/d1buSyHkK+Ipw` |
-| **sshd_user_ca_key_fpr** | User CA fingerprint for cross check |
-`SHA512:UwXpDQfzlsX1H6RNTZd1xDgoOe4X/SzvGSD9H2r8gAnn4+/ZuBDnqNp4guasNnESYEzUdV2kmgOiFwpQ5NCtBQ` |
+| **sshd_host_ca_key_fpr** | Host CA fingerprint for cross check | `SHA512:JW9LfG8wfWkPhQZ4n3ljYKijKpOH/oNuJYjtKbzHvWkjrqseTdobkOskjqAHqj8WAfpCkmOp/d1buSyHkK+Ipw` |
+| **sshd_user_ca_key_fpr** | User CA fingerprint for cross check | `SHA512:UwXpDQfzlsX1H6RNTZd1xDgoOe4X/SzvGSD9H2r8gAnn4+/ZuBDnqNp4guasNnESYEzUdV2kmgOiFwpQ5NCtBQ` |
 | **sshd_host_ca_key** | Full path to Host CA | `"{{ sshd_cfg_dir }}/id_{{ sshd_algo }}-HostCA"` |
 | **sshd_user_ca_key** | Full path to User CA | `"{{ sshd_cfg_dir }}/id_{{ sshd_algo }}-UserCA"` |
 | **sshd_host_ca_comment** | Full path to User CA | `"{{ sshd_cfg_dir }}/id_{{ sshd_algo }}-UserCA"` |
@@ -135,7 +134,7 @@ Example Playbook
     - hosts: macos_hosts
       gather_facts: yes
       roles:
-         - { role: drew-kun.sshd, sshd_port: 2222, sshd_from_homebrew: yes}
+         - { role: drew-kun.sshd, sshd_port: 2222, sshd_from_homebrew: yes, sshd_cert_id: mycooldomain.com }
 
 License
 -------
@@ -152,4 +151,5 @@ Andrew Shagayev | [e-mail](mailto:drewshg@gmail.com)
 [mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
 [mit-link]: https://raw.githubusercontent.com/drew-kun/ansible-sshd/master/LICENSE
 [homebrew]: http://brew.sh/
+[keepass]: https://keepassxc.org/
 
