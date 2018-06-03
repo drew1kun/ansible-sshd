@@ -1,4 +1,4 @@
----
+-
 # CREATE USER CA
 #========== Process CA keys data start ===========
 - name: "[UserCA] Locally check if {{ sshd_user_ca_key }} key pair already exists"
@@ -6,42 +6,73 @@
   register: sshd_user_ca_kfiles
   with_items: ["{{ sshd_user_ca_key }}", "{{ sshd_user_ca_key }}.pub"]
   delegate_to: localhost
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[UserCA] Combine User CA pub and priv keys existence status into dictionary: STEP 1, register dict as results"
   set_fact:
-    sshd_user_ca_tmp:
-      "{{ sshd_user_ca_tmp|default({})|combine({'file': item.item, 'exists': item.stat.exists}) }}"
+    sshd_user_ca_tmp: "{{ sshd_user_ca_tmp|default({})|combine({'file': item.item, 'exists': item.stat.exists}) }}"
   register: sshd_user_ca_k_rslt
   with_items: "{{ sshd_user_ca_kfiles.results }}"
   no_log: yes
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[UserCA] Combine User CA pub and priv keys existence status into dictionary: STEP 2, modifying var"
   set_fact:
-    sshd_user_ca:
-      "{{ sshd_user_ca|default({})|combine({ item[0]: item[1].ansible_facts.sshd_user_ca_tmp}) }}"
+    sshd_user_ca: "{{ sshd_user_ca|default({})|combine({ item[0]: item[1].ansible_facts.sshd_user_ca_tmp}) }}"
   with_together:
     - ['priv_key', 'pub_key']
     - "{{ sshd_user_ca_k_rslt.results }}"
   no_log: yes
+  tags:
+    - sshd
+    - sshd_certs
 #=========== Process CA keys data end ============
 
 #========= Perform CA files check start ==========
+# When running against one managed host it works totally as expected.
+# When running against group of hosts, it runs once for each host.
+# But because it's a local action, running it for second host returns error as key alredy exists.
+# Therefor this task must be run only once, no matter how many hosts are currently managed.
+# Here is workaround with bash 'test' and `; exit 0`
 - name: "[UserCA] Locally generate a User CA key pair if it doesn't exist"
-  shell:
-    ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_user_ca_key }} -q -N "{{ sshd_user_ca_pwd }}" #-C "{{ sshd_ca_comment }}"
+  shell: >
+    [[ ! -f {{ sshd_user_ca_key }} ]] && \
+    ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_user_ca_key }} -q -N '' -C '{{ sshd_user_ca_comment }}'; \
+    exit 0
   become: yes
   register: sshd_user_ca_generated
   delegate_to: localhost
   notify: Generated User CA info
   when: not sshd_user_ca.priv_key.exists
+  tags:
+    - sshd
+    - sshd_certs
+
+# Usually broken pub keys are left after typing wrong passphrase during retrieve from private key process
+- name: "[UserCA] Locally detect broken User CA public key by checking its' fingerprint"
+  shell: ssh-keygen -l -f {{ sshd_user_ca_key }} -E SHA512 | cut -d ' ' -f 2
+  register: sshd_user_ca_fpr
+  become: yes
+  delegate_to: localhost
+  changed_when: false
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[UserCA] Locally retrieve User CA public key form private if pub key file doesn't exist"
   shell: "ssh-keygen -y -f {{ sshd_user_ca_key }} > {{ sshd_user_ca_key }}.pub"
-  delegate_to: localhost
   become: yes
+  delegate_to: localhost
   when:
     - sshd_user_ca.priv_key.exists
-    - not sshd_user_ca.pub_key.exists
+    - not sshd_user_ca.pub_key.exists or sshd_user_ca_fpr.stdout == ''
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[UserCA] Locally register the User CA keys' fingerprints"
   shell: ssh-keygen -l -E SHA512 -f {{ sshd_user_ca.pub_key.file }} | cut -d ' ' -f 2
@@ -49,6 +80,9 @@
   become: yes
   delegate_to: localhost
   changed_when: false
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[UserCA] Assert that the User CA fingerprint matches the one specified in defaults/main.yml"
   assert:
@@ -64,18 +98,17 @@
       - "        rm -f {{ sshd_user_ca_key }} {{ sshd_user_ca_key }}.pub"
       - "MAKE SURE YOU MAKE A BACKUP BEFORE REMOVING OLD CA"
   when: not sshd_user_ca_generated.changed
+  tags:
+    - sshd
+    - sshd_certs
 #========== Perform CA files check end ===========
 
-- debug:
-    msg: "sshd_user_ca: {{ sshd_user_ca }}"
-
 - name: "[UserCA] Copy User CA public key to sshd server"
-  copy:
-    src: "{{ sshd_user_ca.pub_key.file }}"
-    dest: "{{ sshd_cfg_dir }}"
-    mode: 0644
-    owner: root
-    group: "{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
+  copy: src="{{ sshd_user_ca.pub_key.file }}" dest="{{ sshd_cfg_dir }}" mode=0644
+        owner=root group="{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
   register: sshd_user_ca_pub
   become: yes
+  tags:
+    - sshd
+    - sshd_certs
 ...

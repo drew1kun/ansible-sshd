@@ -10,35 +10,62 @@
   register: sshd_host_ca_kfiles
   with_items: ["{{ sshd_host_ca_key }}", "{{ sshd_host_ca_key }}.pub"]
   delegate_to: localhost
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[HostCA] Combine Host CA pub and priv keys existence status into dictionary: STEP 1, register dict as results"
   set_fact:
-    sshd_host_ca_tmp:
-      "{{ sshd_host_ca_tmp|default({})|combine({'file': item.item, 'exists': item.stat.exists}) }}"
+    sshd_host_ca_tmp: "{{ sshd_host_ca_tmp|default({})|combine({'file': item.item, 'exists': item.stat.exists}) }}"
   register: sshd_host_ca_k_rslt
   with_items: "{{ sshd_host_ca_kfiles.results }}"
   no_log: yes
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[HostCA] Combine Host CA pub and priv keys existence status into dictionary: STEP 2, modifying var"
   set_fact:
-    sshd_host_ca:
-      "{{ sshd_host_ca|default({})|combine({ item[0]: item[1].ansible_facts.sshd_host_ca_tmp}) }}"
+    sshd_host_ca: "{{ sshd_host_ca|default({})|combine({ item[0]: item[1].ansible_facts.sshd_host_ca_tmp}) }}"
   with_together:
     - ['priv_key', 'pub_key']
     - "{{ sshd_host_ca_k_rslt.results }}"
   no_log: yes
+  tags:
+    - sshd
+    - sshd_certs
 #=========== Process CA keys data end ============
 
 #========= Perform CA files check start ==========
+# When running against one managed host it works totally as expected.
+# When running against group of hosts, it runs once for each host.
+# But because it's a local action, running it for second host returns error as key alredy exists.
+# Therefor this task must be run only once, no matter how many hosts are currently managed.
+# Here is workaround with bash 'test' and `; exit 0`
 - name: "[HostCA] Locally generate a Host CA key pair if it doesn't exist"
-  shell:
-    ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_host_ca_key }} \
-    -q -N "{{ sshd_host_ca_pwd }}" #-C "{{ sshd_ca_comment }}"
+  shell: >
+    [[ ! -f {{ sshd_host_ca_key }} ]] && \
+    ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_host_ca_key }} -q -N '' -C '{{ sshd_host_ca_comment }}'; \
+    exit 0
   become: yes
   register: sshd_host_ca_generated
   delegate_to: localhost
   notify: Generated Host CA info
   when: not sshd_host_ca.priv_key.exists
+  tags:
+    - sshd
+    - sshd_certs
+
+# Usually broken pub keys are left after typing wrong passphrase during retrieve from private key process
+- name: "[HostCA] Locally detect broken Host CA public key by checking its' fingerprint"
+  shell: ssh-keygen -l -f {{ sshd_host_ca.pub_key.file }} -E SHA512 | cut -d ' ' -f 2
+  register: sshd_host_ca_fpr
+  become: yes
+  delegate_to: localhost
+  changed_when: false
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[HostCA] Locally retrieve Host CA public key form private if pub key file doesn't exist"
   shell: "ssh-keygen -y -f {{ sshd_host_ca_key }} > {{ sshd_host_ca_key }}.pub"
@@ -46,7 +73,10 @@
   become: yes
   when:
     - sshd_host_ca.priv_key.exists
-    - not sshd_host_ca.pub_key.exists
+    - not sshd_host_ca.pub_key.exists or sshd_host_ca_fpr.stdout == ''
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[HostCA] Locally register the Host CA keys' fingerprints"
   shell: ssh-keygen -l -E SHA512 -f {{ sshd_host_ca.pub_key.file }} | cut -d ' ' -f 2
@@ -54,6 +84,9 @@
   become: yes
   delegate_to: localhost
   changed_when: false
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[HostCA] Assert that the Host CA fingerprint matches the one specified in defaults/main.yml"
   assert:
@@ -69,6 +102,9 @@
       - "        rm -f {{ sshd_host_ca_key }} {{ sshd_host_ca_key }}.pub"
       - "MAKE SURE YOU MAKE A BACKUP BEFORE REMOVING OLD CA"
   when: not sshd_host_ca_generated.changed
+  tags:
+    - sshd
+    - sshd_certs
 #========== Perform CA files check end ===========
 
 #======= Locally modify known_hosts start ========
@@ -77,6 +113,9 @@
   register: sshd_host_ca_pub
   changed_when: false
   delegate_to: localhost
+  tags:
+    - sshd
+    - sshd_certs
 
 # This will cleanup the known_host on our ssh client machine.
 # It is important in case the HostCA private key was spoofed while it's private key is correct.
@@ -85,12 +124,18 @@
 - name: "[HostCA] Locally copy Host CA's public key to known_hosts file"
   template:
     src: known_hosts.j2
-    dest: ~/.ssh/known_hosts
-    owner: "{{ ansible_user_id }}"
-    group: staff
-    #group: "{{ 'staff' if ansible_os_family == 'Darwin' else ansible_user_id }}"
+    dest: "{{ item.home }}/.ssh/known_hosts"
+    owner: "{{ item.name }}"
+    group: "{{ 'staff' if sshd_local_os.stdout == 'Darwin' else item.name }}"
     mode: 0644
+  become: yes
   delegate_to: localhost
+  with_items: "{{ sshd_local_users.results }}"
+  no_log: yes
+  tags:
+    - sshd
+    - sshd_certs
+
 #======== Locally modify known_hosts end =========
 
 # ISSUE HOST CERTIFICATE
@@ -103,38 +148,48 @@
     - "{{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key"
     - "{{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key.pub"
     - "{{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key-cert.pub"
+  tags:
+    - sshd
+    - sshd_certs
 
 # data processing:
 - name: "[HostCA] Combine host pub, priv keys and cert existence status into dictionary: STEP 1, register dict as results"
   set_fact:
-    sshd_host_k_tmp:
-      "{{ sshd_host_k_tmp|default({})|combine({'file': item.item,
-        'exists': item.stat.exists}) }}"
+    sshd_host_k_tmp: "{{ sshd_host_k_tmp|default({})|combine({'file': item.item,
+                      'exists': item.stat.exists}) }}"
   register: sshd_host_k_rslt
   with_items: "{{ sshd_host_keys.results }}"
   no_log: yes
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[HostCA] Combine Host CA pub, priv keys and cert existence status into dictionary: STEP 2, modifying var"
   set_fact:
-    sshd_host_k:
-      "{{ sshd_host_k|default({})|combine({ item[0]: item[1].ansible_facts.sshd_host_k_tmp}) }}"
+    sshd_host_k: "{{ sshd_host_k|default({})|combine({ item[0]: item[1].ansible_facts.sshd_host_k_tmp}) }}"
   with_together:
     - ['priv_key', 'pub_key', 'cert']
     - "{{ sshd_host_k_rslt.results }}"
   no_log: yes
+  tags:
+    - sshd
+    - sshd_certs
+
 #========== Process host keys data end ===========
 
 #========= Perform host keys check start =========
 - name: "[HostCA] Check the host cert's Signing CA fingerprint when host private key and cert exist"
-  shell:
-    ssh-keygen -L -E SHA512 -f {{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key-cert.pub | \
-    fgrep "Signing CA" | sed 's/^[ \t]*//' | cut -d ' ' -f 4
+  shell: ssh-keygen -L -E SHA512 -f {{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key-cert.pub | \
+         fgrep "Signing CA" | sed 's/^[ \t]*//' | cut -d ' ' -f 4
   become: yes
   register: sshd_host_cert_ca_fpr
   changed_when: false
   when:
     - sshd_host_k.priv_key.exists
     - sshd_host_k.cert.exists
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[HostCA] Retrieve host public key form private if pub key file doesn't exist"
   shell: "ssh-keygen -y -f {{ sshd_host_k.priv_key.file }} > {{ sshd_host_k.pub_key.file }}"
@@ -142,34 +197,48 @@
   when:
     - sshd_host_k.priv_key.exists
     - not sshd_host_k.pub_key.exists
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[HostCA] Locally generate host key pair if there is no correct host certificate already on the system"
   shell: echo 'y' | ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f /tmp/ssh_host_{{ sshd_algo }}_key
   delegate_to: localhost
   when: not sshd_host_k.priv_key.exists
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: "[HostCA] Locally sign the host key and generate certificate if cert doesn't exist or it's fingerprint is wrong"
-  shell: echo 'y' | ssh-keygen -s {{ sshd_host_ca_key }} -h -V +52w -I {{ sshd_cert_id }}-host /tmp/ssh_host_{{ sshd_algo }}_key.pub
+  shell: echo 'y' | \
+         ssh-keygen -s {{ sshd_host_ca_key }} -h -V +52w -I {{ sshd_cert_id }}-host /tmp/ssh_host_{{ sshd_algo }}_key.pub
   register: sshd_eventlog
   become: yes
   delegate_to: localhost
   when: not sshd_host_k.cert.exists or
         sshd_host_cert_ca_fpr.stdout != sshd_host_ca_fpr.stdout
+  tags:
+    - sshd
+    - sshd_certs
 
-- name: "[HostCA] Locally log the key signing event"
+- name: "[HostCA] Locally log the key signing event in {{ sshd_certlogger }}"
   shell: echo {{ sshd_eventlog }} >> {{ sshd_certlogger }}
   delegate_to: localhost
   when: sshd_eventlog.changed
+  tags:
+    - sshd
+    - sshd_certs
 
-- name: "[HostCA] Copy host public key and host certificate to a host with correct permissions - 0644"
-  copy: src="{{ item }}" dest="{{ sshd_cfg_dir }}" mode=0644
+- name: '[CertsClient] Copy host keys and certificate to a host with correct permissions'
+  copy: src="{{ item.src }}" dest="{{ sshd_cfg_dir }}" mode="{{ item.mode }}"
+        owner='root' group="{{ 'staff' if ansible_os_family == 'Darwin' else ansible_user_id }}"
   become: yes
   with_items:
-    - "/tmp/ssh_host_{{ sshd_algo }}_key.pub"
-    - "/tmp/ssh_host_{{ sshd_algo }}_key-cert.pub"
-
-- name: "[HostCA] Copy host private key with correct permissions - 0600"
-  copy: src="/tmp/ssh_host_{{ sshd_algo }}_key" dest="{{ sshd_cfg_dir }}" mode=0600
-  become: yes
+    - { 'src': "/tmp/ssh_host_{{ sshd_algo }}_key", 'mode': '0600' } # Mode must be set as string using quotes
+    - { 'src': "/tmp/ssh_host_{{ sshd_algo }}_key.pub", 'mode': '0644' } # like this: '0600' not 0600.
+    - { 'src': "/tmp/ssh_host_{{ sshd_algo }}_key-cert.pub", 'mode': '0644' } # this is an ansible bug
+  tags:
+    - sshd
+    - sshd_certs
 #========= Perform host keys check end ===========
 ...

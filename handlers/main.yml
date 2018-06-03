@@ -10,7 +10,7 @@
       - "The Host CA private key is saved as:"
       - "        {{ sshd_host_ca_key }}"
       - "Please back up this Host CA file and keep it in the secure place"
-      - "NOTE: the new CA private key is not encrypted (doesn't have a passphrase)"
+      - "NOTE: the new Host CA private key is not encrypted (doesn't have a passphrase)"
 
 - name: Generated User CA info
   debug:
@@ -21,7 +21,7 @@
       - "The User CA private key is saved as:"
       - "        {{ sshd_user_ca_key }}"
       - "Please back up this User CA file and keep it in the secure place"
-      - "NOTE: the new CA private key is not encrypted (doesn't have a passphrase)"
+      - "NOTE: the new User CA private key is not encrypted (doesn't have a passphrase)"
 
 # Linux (SysV, systemd), FreeBSD (BSD init)
 - name: Restart sshd service
@@ -34,7 +34,7 @@
 - name: ATTENTION!
   debug:
     msg:
-      - "sshd is an essential service for ansible AND"
+      - "sshd is an essential service for ansible"
       - "launchd does not support sshd.plist reload with one command"
       - "So the sshd was not reloaded in order to apply changes and must be done manually:"
       - "    'launchctl unload -w /System/Library/LaunchDaemons/ssh.plist'"

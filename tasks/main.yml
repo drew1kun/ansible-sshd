@@ -1,29 +1,38 @@
 ---
 # tasks file for ansible-sshd
 
-#- name: '[main] Include Darwin-specific tasks if provisioning MacOS'
-#  include_tasks: Darwin.yml
-#  when: ansible_os_family == 'Darwin'
-#  tags:
-#    - sshd
-
-#- name: '[main] Include Host CA tasks if using SSH Certificates for hardening setup'
-#  include_tasks: advanced/HostCA.yml
-#  when: sshd_certs
-#  tags:
-#    - sshd
-
-- name: '[main] Include User CA tasks if using SSH Certificates for hardening setup'
-  include_tasks: advanced/UserCA.yml
-  when: sshd_certs
+- name: '[main] Include Darwin-specific tasks if provisioning MacOS'
+  include_tasks: Darwin.yml
+  when: ansible_os_family == 'Darwin'
   tags:
     - sshd
 
-- name: '[main] Include User CA tasks if using SSH Certificates for hardening setup'
-  include_tasks: advanced/UserCerts.yml
+- name: '[main] Include prerequisite tasks'
+  include_tasks: prerequisites.yml
+  tags:
+    - sshd
+    - sshd_certs
+
+- name: '[main] Include Host CA tasks if using SSH Certificates for hardening setup'
+  include_tasks: certificate_setup/HostCA.yml
   when: sshd_certs
   tags:
     - sshd
+    - sshd_certs
+
+- name: '[main] Include User CA tasks if using SSH Certificates for hardening setup'
+  include_tasks: certificate_setup/UserCA.yml
+  when: sshd_certs
+  tags:
+    - sshd
+    - sshd_certs
+
+- name: '[main] Include User CA tasks if using SSH Certificates for hardening setup'
+  include_tasks: certificate_setup/UserCerts.yml
+  when: sshd_certs
+  tags:
+    - sshd
+    - sshd_certs
 
 - name: '[main] Include tasks for sshd setup'
   include_tasks: setup.yml

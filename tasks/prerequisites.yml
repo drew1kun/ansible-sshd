@@ -1,0 +1,77 @@
+---
+- name: '[prerequisites] Check local distro'
+  command: uname
+  register: sshd_local_os
+  delegate_to: localhost
+  changed_when: false
+  when: sshd_certs
+
+- name: '[prerequisites] Make sure the ssh users exist on remote ssh server'
+  user:
+    name: "{{ item.username }}"
+  with_items: "{{ sshd_users }}"
+  become: yes
+  tags:
+    - sshd
+
+- name: '[prerequisites] Register users home directories on remote host'
+  user:
+    name: "{{ item.username }}"
+  register: sshd_remote_users
+  with_items: "{{ sshd_users }}"
+  tags:
+    - sshd
+
+- name: '[prerequisites] Make sure the ssh users exist on local ssh server if Certificate Setup is performed'
+  user:
+    name: "{{ item.username }}"
+  with_items: "{{ sshd_users }}"
+  become: yes
+  delegate_to: localhost
+  when: sshd_certs
+  tags:
+    - sshd
+    - sshd_certs
+
+- name: '[prerequisites] Register users home directories on local host if Certificate Setup is performed'
+  user:
+    name: "{{ item.username }}"
+  register: sshd_local_users
+  with_items: "{{ sshd_users }}"
+  delegate_to: localhost
+  when: sshd_certs
+  tags:
+    - sshd
+    - sshd_certs
+
+- name: '[prerequisites] Make sure users ssh key directories exist locally if Certificate Setup is performed'
+  file:
+    state: directory
+    path: "{{ item.home }}/.ssh"
+    mode: 0755
+    owner: "{{ item.name }}"
+    group: "{{ 'staff' if sshd_local_os.stdout == 'Darwin' else item.name }}"
+  become: yes
+  with_items: "{{ sshd_local_users.results }}"
+  delegate_to: localhost
+  when: sshd_certs
+  no_log: yes
+  tags:
+    - sshd
+    - sshd_certs
+
+- name: '[prerequisites] Make sure users ssh key directories exist on remote host if Certificate Setup is performed'
+  file:
+    state: directory
+    path: "{{ item.home }}/.ssh"
+    mode: 0755
+    owner: "{{ item.name }}"
+    group: "{{ 'staff' if ansible_os_family == 'Darwin' else item.name }}"
+  become: yes
+  with_items: "{{ sshd_remote_users.results }}"
+  when: sshd_certs
+  no_log: yes
+  tags:
+    - sshd
+    - sshd_certs
+...

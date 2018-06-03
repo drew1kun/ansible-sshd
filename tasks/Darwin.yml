@@ -10,7 +10,7 @@
 - name: "[Darwin] Include vars from Darwin_pre_10.12.yml only if configuring system sshd (not the one from homebrew)"
   include_vars: Darwin_pre_10.12.yml
   when:
-    - not ansible_distribution_version.startswith('10.12')
+    - ansible_distribution_version.startswith('10.12')
     - not sshd_from_homebrew
   tags:
     - sshd
