@@ -13,7 +13,7 @@ The role does the following:
     enable pki authentication and only allow users, which are specified in `sshd_users`. See deatials in
     [*templates/sshd_config.j2*](templates/sshd_config.j2)
 
-**Certifiacte Setup:**
+Certifiacte Setup:
 
 The following will be done when variable `sshd_certs` set to `yes` (default):
 
