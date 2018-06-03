@@ -36,10 +36,10 @@ and their fingerprints as **SHA512** (`sshd_host_ca_key_fpr` and `sshd_user_ca_k
 keys. Public keys will be retrieved from the private keys of specified CA automatically if it exists.
 If there is no specific User or Host CA you want to use, then you need  the specified files will be created automatically.
 
-To provide complete non-interactivness User and Host CA private key files will be UNENCRYPTED () so please back up them
-and store in a secure place (like [KeepassXC][keepass] db etc..). By default the files will be stored in */etc/ssh/* (or in
-*/etc* for MacOS 10.12 or earlier), owned by root and protected by Unix permissions. The corresponding notifications
-wil pop up upon successful role execution.
+To provide complete non-interactivness User and Host CA private key files will be UNENCRYPTED (no passphrase protection)
+so please back up them and store in a secure place (like [KeepassXC][keepass] db etc..). By default the files will be
+stored in */etc/ssh/* (or in */etc* for MacOS 10.12 or earlier), owned by root and protected by Unix permissions.
+The corresponding notifications wil pop up upon successful role execution.
 
 Requirements
 ------------
