@@ -5,7 +5,8 @@
     dest: /etc/motd
     owner: root
     group: "{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
-    mode: 0664  # on Debian 0600 - works for any user; on CentOS - must be readable by anyone
+    # on Debian mode 0600 - works for any user; on CentOS - must be readable by anyone:
+    mode: "{{ '0664' if ansible_os_family == 'RedHat' else '0600' }}"
   become: yes
   notify: Restart sshd
   tags:
@@ -63,7 +64,6 @@
     group: "{{ 'wheel' if ansible_os_family == 'Darwin' else 'root' }}"
     mode: 0600
   become: yes
-  #when: ansible_os_family != 'Darwin' or ansible_os_family == 'Darwin' and ansible_distribution_version.startswith('10.12')
   notify: Restart sshd
   tags:
     - sshd

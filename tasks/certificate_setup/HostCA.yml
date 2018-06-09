@@ -43,10 +43,8 @@
 # Therefor this task must be run only once, no matter how many hosts are currently managed.
 # Here is workaround with bash 'test' and `; exit 0`
 - name: "[HostCA] Locally generate a Host CA key pair if it doesn't exist"
-  shell: >
-    [[ ! -f {{ sshd_host_ca_key }} ]] && \
-    ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_host_ca_key }} -q -N '' -C '{{ sshd_host_ca_comment }}'; \
-    exit 0
+  command: ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_host_ca_key }} -q -N '' -C '{{ sshd_host_ca_comment }}'
+  run_once: yes
   become: yes
   register: sshd_host_ca_generated
   delegate_to: localhost
@@ -204,7 +202,8 @@
 - name: "[HostCA] Locally generate host key pair if there is no correct host certificate already on the system"
   shell: echo 'y' | ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f /tmp/ssh_host_{{ sshd_algo }}_key
   delegate_to: localhost
-  when: not sshd_host_k.priv_key.exists
+  when: not sshd_host_k.priv_key.exists or
+        sshd_host_cert_ca_fpr.stdout != sshd_host_ca_fpr.stdout
   tags:
     - sshd
     - sshd_certs
@@ -229,9 +228,9 @@
     - sshd
     - sshd_certs
 
-- name: '[CertsClient] Copy host keys and certificate to a host with correct permissions'
+- name: '[HostCA] Copy host keys and certificate to a host with correct permissions'
   copy: src="{{ item.src }}" dest="{{ sshd_cfg_dir }}" mode="{{ item.mode }}"
-        owner='root' group="{{ 'staff' if ansible_os_family == 'Darwin' else ansible_user_id }}"
+        owner='root' group="{{ 'wheel' if ansible_os_family == 'Darwin' else 'root'}}"
   become: yes
   with_items:
     - { 'src': "/tmp/ssh_host_{{ sshd_algo }}_key", 'mode': '0600' } # Mode must be set as string using quotes

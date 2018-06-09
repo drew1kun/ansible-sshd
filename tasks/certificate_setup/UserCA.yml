@@ -39,10 +39,8 @@
 # Therefor this task must be run only once, no matter how many hosts are currently managed.
 # Here is workaround with bash 'test' and `; exit 0`
 - name: "[UserCA] Locally generate a User CA key pair if it doesn't exist"
-  shell: >
-    [[ ! -f {{ sshd_user_ca_key }} ]] && \
-    ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_user_ca_key }} -q -N '' -C '{{ sshd_user_ca_comment }}'; \
-    exit 0
+  command: ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_host_ca_key }} -q -N '' -C '{{ sshd_host_ca_comment }}'
+  run_once: yes
   become: yes
   register: sshd_user_ca_generated
   delegate_to: localhost
@@ -102,6 +100,15 @@
     - sshd
     - sshd_certs
 #========== Perform CA files check end ===========
+
+- name: "[UserCA] Check if {{ sshd_cfg_dir }}/revoked_keys exist"
+  stat: path="{{ sshd_cfg_dir }}/revoked_keys"
+  register: sshd_rev_keys
+
+- name: "[UserCA] Create {{ sshd_cfg_dir }}/revoked_keys if it does not exist"
+  file: path="{{ sshd_cfg_dir }}/revoked_keys" state=touch
+  become: yes
+  when: not sshd_rev_keys.stat.exists
 
 - name: "[UserCA] Copy User CA public key to sshd server"
   copy: src="{{ sshd_user_ca.pub_key.file }}" dest="{{ sshd_cfg_dir }}" mode=0644

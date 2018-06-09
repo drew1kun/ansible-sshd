@@ -16,7 +16,6 @@ HostCertificate {{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key-cert.pub
 {% endif %}
 TrustedUserCAKeys {{ sshd_user_ca_pub.dest }}
 
-
 #=================================== LOGGING ===================================
 SyslogFacility AUTHPRIV 	# obsoletes QuietMode and FascistLogging
 LogLevel ERROR 			# If disk spase is not concern, use 'LogLevel INFO'
@@ -37,17 +36,18 @@ PermitRootLogin prohibit-password # Use root login only with pub key authenticat
 PermitRootLogin no  		# No root login
 {% endif %}
 
-StrictModes yes 		# Force permissions checks on keyfiles and directories
+StrictModes yes			# Force permissions checks on keyfiles and directories
 MaxAuthTries 4			# 6 is default
 MaxSessions 4			# Must be 4 or more in order to provision multiple users with ansible
 
 PubkeyAuthentication yes 	# Use public key authentication:
 AuthorizedKeysFile      %h/.ssh/authorized_keys  # %h - home directory (may be omitted)
-
 #AuthorizedPrincipalsFile none
-
 #AuthorizedKeysCommand none
 #AuthorizedKeysCommandUser nobody
+{% if sshd_certs %}
+RevokedKeys {{ sshd_cfg_dir }}/revoked_keys  # This file must exist on the system, otherwise Permission will be denied.
+{% endif %}
 
 HostbasedAuthentication no   	# For this to work host keys in /etc/ssh/ssh_known_hosts needed
 IgnoreUserKnownHosts yes 	# Don't trust ~/.ssh/known_hosts for RhostsRSAAuthentication
