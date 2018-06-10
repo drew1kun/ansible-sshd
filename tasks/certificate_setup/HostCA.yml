@@ -1,15 +1,12 @@
 ---
 # CREATE HOST CA
 #========== Process CA keys data start ===========
-#- name: "[HostCA] Turn off the host key checking only once for initial key deployment"
-#  shell: export ANSIBLE_HOST_KEY_CHECKING=False
-#  delegate_to: localhost
-
 - name: "[HostCA] Locally check if {{ sshd_host_ca_key }} key pair already exists"
   stat: path="{{ item }}"
   register: sshd_host_ca_kfiles
   with_items: ["{{ sshd_host_ca_key }}", "{{ sshd_host_ca_key }}.pub"]
   delegate_to: localhost
+  run_once: yes
   tags:
     - sshd
     - sshd_certs
@@ -44,10 +41,10 @@
 # Here is workaround with bash 'test' and `; exit 0`
 - name: "[HostCA] Locally generate a Host CA key pair if it doesn't exist"
   command: ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_host_ca_key }} -q -N '' -C '{{ sshd_host_ca_comment }}'
-  run_once: yes
   become: yes
   register: sshd_host_ca_generated
   delegate_to: localhost
+  run_once: yes
   notify: Generated Host CA info
   when: not sshd_host_ca.priv_key.exists
   tags:
@@ -60,6 +57,7 @@
   register: sshd_host_ca_fpr
   become: yes
   delegate_to: localhost
+  run_once: yes
   changed_when: false
   tags:
     - sshd
@@ -68,6 +66,7 @@
 - name: "[HostCA] Locally retrieve Host CA public key form private if pub key file doesn't exist"
   shell: "ssh-keygen -y -f {{ sshd_host_ca_key }} > {{ sshd_host_ca_key }}.pub"
   delegate_to: localhost
+  run_once: yes
   become: yes
   when:
     - sshd_host_ca.priv_key.exists
@@ -111,6 +110,7 @@
   register: sshd_host_ca_pub
   changed_when: false
   delegate_to: localhost
+  run_once: yes
   tags:
     - sshd
     - sshd_certs
@@ -128,6 +128,7 @@
     mode: 0644
   become: yes
   delegate_to: localhost
+  run_once: yes
   with_items: "{{ sshd_local_users.results }}"
   no_log: yes
   tags:
@@ -143,9 +144,9 @@
   stat: path="{{ item }}"
   register: sshd_host_keys
   with_items:
-    - "{{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key"
-    - "{{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key.pub"
-    - "{{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key-cert.pub"
+    - "{{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key_{{ inventory_hostname }}"
+    - "{{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key_{{ inventory_hostname }}.pub"
+    - "{{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key_{{ inventory_hostname }}-cert.pub"
   tags:
     - sshd
     - sshd_certs
@@ -176,15 +177,11 @@
 #========== Process host keys data end ===========
 
 #========= Perform host keys check start =========
-- name: "[HostCA] Check the host cert's Signing CA fingerprint when host private key and cert exist"
-  shell: ssh-keygen -L -E SHA512 -f {{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key-cert.pub | \
-         fgrep "Signing CA" | sed 's/^[ \t]*//' | cut -d ' ' -f 4
-  become: yes
-  register: sshd_host_cert_ca_fpr
-  changed_when: false
-  when:
-    - sshd_host_k.priv_key.exists
-    - sshd_host_k.cert.exists
+- name: "[HostCA] Locally generate host key pair if there is no correct host certificate already on the system"
+  shell: echo 'y' | ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" \
+         -f /tmp/ssh_host_{{ sshd_algo }}_key_{{ inventory_hostname }}
+  delegate_to: localhost
+  when: not sshd_host_k.priv_key.exists
   tags:
     - sshd
     - sshd_certs
@@ -199,18 +196,24 @@
     - sshd
     - sshd_certs
 
-- name: "[HostCA] Locally generate host key pair if there is no correct host certificate already on the system"
-  shell: echo 'y' | ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" -f /tmp/ssh_host_{{ sshd_algo }}_key
-  delegate_to: localhost
-  when: not sshd_host_k.priv_key.exists or
-        sshd_host_cert_ca_fpr.stdout != sshd_host_ca_fpr.stdout
+- name: "[HostCA] Check the host cert's Signing CA fingerprint when host private key and cert exist"
+  shell: ssh-keygen -L -E SHA512 -f \
+         {{ sshd_cfg_dir }}/ssh_host_{{ sshd_algo }}_key_{{ inventory_hostname }}-cert.pub | \
+         fgrep "Signing CA" | sed 's/^[ \t]*//' | cut -d ' ' -f 4
+  become: yes
+  register: sshd_host_cert_ca_fpr
+  changed_when: false
+  when:
+    - sshd_host_k.priv_key.exists
+    - sshd_host_k.cert.exists
   tags:
     - sshd
     - sshd_certs
 
 - name: "[HostCA] Locally sign the host key and generate certificate if cert doesn't exist or it's fingerprint is wrong"
   shell: echo 'y' | \
-         ssh-keygen -s {{ sshd_host_ca_key }} -h -V +52w -I {{ sshd_cert_id }}-host /tmp/ssh_host_{{ sshd_algo }}_key.pub
+         ssh-keygen -s {{ sshd_host_ca_key }} -h -V +52w -I {{ sshd_cert_id }}-host \
+         /tmp/ssh_host_{{ sshd_algo }}_key_{{ inventory_hostname }}.pub
   register: sshd_eventlog
   become: yes
   delegate_to: localhost
@@ -233,9 +236,9 @@
         owner='root' group="{{ 'wheel' if ansible_os_family == 'Darwin' else 'root'}}"
   become: yes
   with_items:
-    - { 'src': "/tmp/ssh_host_{{ sshd_algo }}_key", 'mode': '0600' } # Mode must be set as string using quotes
-    - { 'src': "/tmp/ssh_host_{{ sshd_algo }}_key.pub", 'mode': '0644' } # like this: '0600' not 0600.
-    - { 'src': "/tmp/ssh_host_{{ sshd_algo }}_key-cert.pub", 'mode': '0644' } # this is an ansible bug
+    - { 'src': "/tmp/ssh_host_{{ sshd_algo }}_key_{{ inventory_hostname }}", 'mode': '0600' } # Mode must be set as string using quotes
+    - { 'src': "/tmp/ssh_host_{{ sshd_algo }}_key_{{ inventory_hostname }}.pub", 'mode': '0644' } # like this: '0600' not 0600.
+    - { 'src': "/tmp/ssh_host_{{ sshd_algo }}_key_{{ inventory_hostname }}-cert.pub", 'mode': '0644' } # this is an ansible bug
   tags:
     - sshd
     - sshd_certs
