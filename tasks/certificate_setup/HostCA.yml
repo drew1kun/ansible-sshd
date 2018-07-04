@@ -80,6 +80,7 @@
   register: sshd_host_ca_fpr
   become: yes
   delegate_to: localhost
+  run_once: yes
   changed_when: false
   tags:
     - sshd
@@ -177,7 +178,8 @@
 #========== Process host keys data end ===========
 
 #========= Perform host keys check start =========
-- name: "[HostCA] Locally generate host key pair if there is no correct host certificate already on the system"
+# Although it happens locally, this task must be executed for each host
+- name: "[HostCA] Locally generate host key pair if the private host key does not exist"
   shell: echo 'y' | ssh-keygen -o -a 100 -t {{ sshd_algo }} -q -N "" \
          -f /tmp/ssh_host_{{ sshd_algo }}_key_{{ inventory_hostname }}
   delegate_to: localhost

@@ -6,6 +6,7 @@
   register: sshd_user_ca_kfiles
   with_items: ["{{ sshd_user_ca_key }}", "{{ sshd_user_ca_key }}.pub"]
   delegate_to: localhost
+  run_once: yes
   tags:
     - sshd
     - sshd_certs
@@ -40,10 +41,10 @@
 # Here is workaround with bash 'test' and `; exit 0`
 - name: "[UserCA] Locally generate a User CA key pair if it doesn't exist"
   command: ssh-keygen -o -a 100 -t {{ sshd_algo }} -f {{ sshd_host_ca_key }} -q -N '' -C '{{ sshd_host_ca_comment }}'
-  run_once: yes
   become: yes
   register: sshd_user_ca_generated
   delegate_to: localhost
+  run_once: yes
   notify: Generated User CA info
   when: not sshd_user_ca.priv_key.exists
   tags:
@@ -56,6 +57,7 @@
   register: sshd_user_ca_fpr
   become: yes
   delegate_to: localhost
+  run_once: yes
   changed_when: false
   tags:
     - sshd
@@ -65,6 +67,7 @@
   shell: "ssh-keygen -y -f {{ sshd_user_ca_key }} > {{ sshd_user_ca_key }}.pub"
   become: yes
   delegate_to: localhost
+  run_once: yes
   when:
     - sshd_user_ca.priv_key.exists
     - not sshd_user_ca.pub_key.exists or sshd_user_ca_fpr.stdout == ''
@@ -77,6 +80,7 @@
   register: sshd_user_ca_fpr
   become: yes
   delegate_to: localhost
+  run_once: yes
   changed_when: false
   tags:
     - sshd
