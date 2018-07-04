@@ -57,12 +57,12 @@ One of the following OS (or deriviatives):
 If on MacOS the openssh from [Homebrew][homebrew] is intended to be used, then install Homebrew.
 This can be done via galaxy role:
 
-    ansible-galaxy install drew_kun.homebrew
+    ansible-galaxy install drew-kun.homebrew
 
 And include it in the playbook:
 
     roles:
-        - drew_kun.homebrew
+        - drew-kun.homebrew
 
 NOTE1: As ssh is essential service for ansible, this role must be included in the playbook at the end position. No other roles should follow after otherwise the playbook will fail.
 
@@ -134,7 +134,7 @@ Example Playbook
     - hosts: macos_hosts
       gather_facts: yes
       roles:
-         - { role: drew_kun.sshd, sshd_port: 2222, sshd_from_homebrew: yes, sshd_cert_id: mycooldomain.com }
+         - { role: drew-kun.sshd, sshd_port: 2222, sshd_from_homebrew: yes, sshd_cert_id: mycooldomain.com }
 
 License
 -------
@@ -146,10 +146,10 @@ Author Information
 
 Andrew Shagayev | [e-mail](mailto:drewshg@gmail.com)
 
-[role-badge]: https://img.shields.io/badge/role-drew__kun.sshd-green.svg
-[galaxy-link]: https://galaxy.ansible.com/drew_kun/sshd/
+[role-badge]: https://img.shields.io/badge/role-drew--kun.sshd-green.svg
+[galaxy-link]: https://galaxy.ansible.com/drew-kun/sshd/
 [mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
-[mit-link]: https://raw.githubusercontent.com/drew_kun/ansible-sshd/master/LICENSE
+[mit-link]: https://raw.githubusercontent.com/drew-kun/ansible-sshd/master/LICENSE
 [homebrew]: http://brew.sh/
 [keepass]: https://keepassxc.org/
 
