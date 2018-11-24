@@ -131,10 +131,12 @@ None
 Example Playbook
 ----------------
 
-    - hosts: macos_hosts
-      gather_facts: yes
-      roles:
-         - { role: drew-kun.sshd, sshd_port: 2222, sshd_from_homebrew: yes, sshd_cert_id: mycooldomain.com }
+```yaml
+- hosts: macos_hosts
+  gather_facts: yes
+  roles:
+  - { role: drew-kun.sshd, sshd_port: 2222, sshd_from_homebrew: yes, sshd_cert_id: mycooldomain.com }
+```
 
 License
 -------
