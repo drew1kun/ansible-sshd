@@ -1,44 +1,47 @@
 ---
 # handlers file for ansible-sshd
 
-- name: Generated Host CA info
+- name: 'Generated Host CA info'
   debug:
     msg:
-      - "NOTE: The new Host CA keypair was generated on local machine"
-      - "The key fingerprint is:"
-      - "        {{ sshd_host_ca_fpr.stdout }}"
-      - "The Host CA private key is saved as:"
-      - "        {{ sshd_host_ca_key }}"
-      - "Please back up this Host CA file and keep it in the secure place"
-      - "NOTE: the new Host CA private key is not encrypted (doesn't have a passphrase)"
+    - "NOTE: The new Host CA keypair was generated on local machine"
+    - "The key fingerprint is:"
+    - "        {{ sshd_host_ca_fpr.stdout }}"
+    - "The Host CA private key is saved as:"
+    - "        {{ sshd_host_ca_key }}"
+    - "Please back up this Host CA file and keep it in the secure place"
+    - "NOTE: the new Host CA private key is not encrypted (doesn't have a passphrase)"
 
-- name: Generated User CA info
+- name: 'Generated User CA info'
   debug:
     msg:
-      - "NOTE: The new User CA keypair was generated on local machine"
-      - "The key fingerprint is:"
-      - "        {{ sshd_user_ca_fpr.stdout }}"
-      - "The User CA private key is saved as:"
-      - "        {{ sshd_user_ca_key }}"
-      - "Please back up this User CA file and keep it in the secure place"
-      - "NOTE: the new User CA private key is not encrypted (doesn't have a passphrase)"
+    - "NOTE: The new User CA keypair was generated on local machine"
+    - "The key fingerprint is:"
+    - "        {{ sshd_user_ca_fpr.stdout }}"
+    - "The User CA private key is saved as:"
+    - "        {{ sshd_user_ca_key }}"
+    - "Please back up this User CA file and keep it in the secure place"
+    - "NOTE: the new User CA private key is not encrypted (doesn't have a passphrase)"
 
 # Linux (SysV, systemd), FreeBSD (BSD init)
-- name: Restart sshd service
+- name: 'Restart sshd service'
   service: name=sshd state=restarted
   listen: Restart sshd
   become: yes
   when: ansible_os_family != 'Darwin'
 
 # MacOS (launchd)
-- name: ATTENTION!
-  debug:
-    msg:
-      - "sshd is an essential service for ansible"
-      - "launchd does not support sshd.plist reload with one command"
-      - "So the sshd was not reloaded in order to apply changes and must be done manually:"
-      - "    'launchctl unload -w /System/Library/LaunchDaemons/ssh.plist'"
-      - "    'launchctl load -w /System/Library/LaunchDaemons/ssh.plist'"
+- name: 'Restart sshd on Mac: Unload /System/Library/LaunchDaemons/ssh.plist'
+  command: launchctl unload -w /System/Library/LaunchDaemons/ssh.plist
+  become: yes
+  listen: Restart sshd
+  async: 1
+  poll: 0
+  when: ansible_os_family == 'Darwin'
+
+- name: 'Restart sshd on Mac: Load /System/Library/LaunchDaemons/ssh.plist'
+  command: launchctl load -w /System/Library/LaunchDaemons/ssh.plist
+  become: yes
   listen: Restart sshd
   when: ansible_os_family == 'Darwin'
 ...
