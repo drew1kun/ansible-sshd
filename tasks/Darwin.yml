@@ -1,8 +1,7 @@
 ---
 - name: "[Darwin] Include vars from Darwin.yml"
   include_vars: Darwin.yml
-  tags:
-    - sshd
+  tags: sshd
 
 # Starting with MacOS 10.12 the sshd configuration moved from /etc/ to /etc/ssh/
 # Overwrite the sshd_cfg_dir variable only if configuing system sshd
@@ -10,16 +9,14 @@
 - name: "[Darwin] Include vars from Darwin_pre_10.12.yml only if configuring system sshd (not the one from homebrew)"
   include_vars: Darwin_pre_10.12.yml
   when:
-    - ansible_distribution_version.startswith('10.12')
-    - not sshd_from_homebrew
-  tags:
-    - sshd
+  - ansible_distribution_version.startswith('10.12')
+  - not sshd_from_homebrew
+  tags: sshd
 
 - name: "[Darwin] Include tasks from homebrew.yml only if configuring sshd from homebrew (overwrites some vars from Darwin.yml)"
   include_tasks: homebrew.yml
   when: sshd_from_homebrew
-  tags:
-    - sshd
+  tags: sshd
 
 # Make sure MacOS uses the correct port for SSH:
 - name: "[Darwin] Modify ssh.plist: <SockServiceName> key statement setting port to {{ sshd_port }}"
@@ -30,8 +27,7 @@
   become: yes
   when: sshd_port is defined and sshd_port != 22
   notify: Restart sshd
-  tags:
-    - sshd
+  tags: sshd
 
 # If using standard port, make ssh.plist look "natural": use 'ssh' port name instead of '22'
 - name: "[Darwin] Modify ssh.plist: make <SockServiceName> key statement use 'ssh' port name instead of '22'"
@@ -42,8 +38,7 @@
   become: yes
   when: sshd_port == 22
   notify: Restart sshd
-  tags:
-    - sshd
+  tags: sshd
 
 - name: "[Darwin] Modify ssh.plist: <Program> key to use system {{ sshd_wrapper_path }}"
   replace:
@@ -52,8 +47,7 @@
     replace: '\1<string>{{ sshd_wrapper_path }}</string>'
   become: yes
   notify: Restart sshd
-  tags:
-    - sshd
+  tags: sshd
 
 - name: "[Darwin] Modify ssh.plist: <ProgramArguments> key to use {{ sshd_bin_path }}"
   replace:
@@ -62,6 +56,5 @@
     replace: '\1<string>{{ sshd_bin_path }}</string>'
   become: yes
   notify: Restart sshd
-  tags:
-    - sshd
+  tags: sshd
 ...

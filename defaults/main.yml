@@ -14,9 +14,10 @@ sshd_port: 22
 #
 # Users on ssh server host to be configured:
 sshd_users:
-  - username: drew
-    key: "{{ lookup('file', 'pub_keys/id_ed25519.pub') }}" # Key to be used if NOT using certificate setup (sshd_certs: no)
-    keypath: /Users/drew/.ssh/id_{{ sshd_algo }} # Local path to user private key to be signed with User CA. Will be created if needed.
+- username: user
+  key: "{{ lookup('file', 'pub_keys/id_ed25519.pub') }}" # Key to be used if NOT using certificate setup (sshd_certs: no)
+  keypath: "/Users/drew/.ssh/id_{{ sshd_algo }}" # Local private key to be signed with User CA. Will be created if needed.
+  comment: "user@email.com"
 
 sshd_root_login: no   # yes | no; No - recommended
                       # If yes, then only passwordless root login (pubkey) will be configured

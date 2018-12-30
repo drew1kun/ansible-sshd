@@ -10,16 +10,14 @@ galaxy_info:
   github_branch: master
 
   platforms:
-    - name: Debian
-      versions:
-      - all
-    - name: MacOSX
-      versions:
-      - 10.12
-      - 10.13
+  - name: Debian
+    versions:
+    - all
+  - name: MacOSX
+    versions:
+    - 10.12
+    - 10.13
 
   galaxy_tags:
-    - ssh
-    - sshd
-
-dependencies: []
+  - ssh
+  - sshd

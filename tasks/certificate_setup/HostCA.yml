@@ -89,16 +89,16 @@
 - name: "[HostCA] Assert that the Host CA fingerprint matches the one specified in defaults/main.yml"
   assert:
     that: sshd_host_ca_fpr.stdout == sshd_host_ca_key_fpr
-    msg:
-      - "ALERT: Host CA's is fingerprint is wrong."
-      - "Host CA fingerprint declared in defaults/main.yml is:"
-      - "        {{ sshd_host_ca_key_fpr }}"
-      - "Actual fingerprint is:"
-      - "        {{ sshd_host_ca_fpr.stdout }}"
-      - "Please make sure you specify the right HostCA file and it's fingerprint at defaults/main.yml"
-      - "ALTERNATIVELY, remove the old incorrect CA keypair from your local machine so the new secrue CA will be created:"
-      - "        rm -f {{ sshd_host_ca_key }} {{ sshd_host_ca_key }}.pub"
-      - "MAKE SURE YOU MAKE A BACKUP BEFORE REMOVING OLD CA"
+    fail_msg:
+      "ALERT: Host CA's is fingerprint is wrong.
+      Host CA fingerprint declared in defaults/main.yml is:
+              {{ sshd_host_ca_key_fpr }}
+      Actual fingerprint is:
+              {{ sshd_host_ca_fpr.stdout }}
+      Please make sure you specify the right HostCA file and it's fingerprint at defaults/main.yml
+      ALTERNATIVELY, remove the old incorrect CA keypair from your local machine so the new secrue CA will be created:
+              rm -f {{ sshd_host_ca_key }} {{ sshd_host_ca_key }}.pub
+      MAKE SURE YOU MAKE A BACKUP BEFORE REMOVING OLD CA"
   when: not sshd_host_ca_generated.changed
   tags:
     - sshd

@@ -1,8 +1,7 @@
 ---
 - name: '[Darwin] Include variables from homebrew.yml'
   include_vars: homebrew.yml
-  tags:
-    - sshd
+  tags: sshd
 
 - name: '[Darwin] Install latest openssh package from homebrew'
   homebrew:
@@ -11,6 +10,5 @@
     state: latest
     update_homebrew: yes
   become: no
-  tags:
-    - sshd
+  tags: sshd
 ...

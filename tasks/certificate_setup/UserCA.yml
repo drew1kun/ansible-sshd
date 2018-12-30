@@ -89,16 +89,16 @@
 - name: "[UserCA] Assert that the User CA fingerprint matches the one specified in defaults/main.yml"
   assert:
     that: sshd_user_ca_fpr.stdout == sshd_user_ca_key_fpr
-    msg:
-      - "ALERT: User CA's is fingerprint is wrong."
-      - "User CA fingerprint declared in defaults/main.yml is:"
-      - "        {{ sshd_user_ca_key_fpr }}"
-      - "Actual fingerprint is:"
-      - "        {{ sshd_user_ca_fpr.stdout }}"
-      - "Please make sure you specify the right UserCA file and it's fingerprint at defaults/main.yml"
-      - "ALTERNATIVELY, remove the old incorrect CA keypair from your local machine so the new secrue CA will be created:"
-      - "        rm -f {{ sshd_user_ca_key }} {{ sshd_user_ca_key }}.pub"
-      - "MAKE SURE YOU MAKE A BACKUP BEFORE REMOVING OLD CA"
+    fail_msg:
+      "ALERT: User CA's is fingerprint is wrong.
+      User CA fingerprint declared in defaults/main.yml is:
+              {{ sshd_user_ca_key_fpr }}
+      Actual fingerprint is:
+              {{ sshd_user_ca_fpr.stdout }}
+      Please make sure you specify the right UserCA file and it's fingerprint at defaults/main.yml
+      ALTERNATIVELY, remove the old incorrect CA keypair from your local machine so the new secrue CA will be created:
+              rm -f {{ sshd_user_ca_key }} {{ sshd_user_ca_key }}.pub
+      MAKE SURE YOU MAKE A BACKUP BEFORE REMOVING OLD CA"
   when: not sshd_user_ca_generated.changed
   tags:
     - sshd

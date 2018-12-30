@@ -8,8 +8,8 @@ Cross-platform ansible role for hardening ssh daemon configuration using PKI and
 
 The role does the following:
 
- - Adds the specified user ssh public keys to ssh server's authorized hosts file, if no certificate setup is used         (`sshd_certs` set to `no`).
- - Creates secure sshd_cofnig which adds a bunch of security tweaks like disable password authentication, root login,
+ - Adds the specified user ssh public keys to ssh server's `authorized_hosts` file, if no certificate setup is used (`sshd_certs` set to `no`).
+ - Creates secure `sshd_cofnig` which adds a bunch of security tweaks like disable password authentication, root login,
     enable pki authentication and only allow users, which are specified in `sshd_users`. See deatials in
     [*templates/sshd_config.j2*](templates/sshd_config.j2)
 
@@ -20,8 +20,8 @@ The following will be done when variable `sshd_certs` set to `yes` (default):
  - The role will create all keypairs, retrieve any public keys from their private portions and generate necessary
     certificates only if needed (complete idempotency). If you have any keys you want to use (user private keys, Host or User
     CA private keys) just specify them in corresponding variables.
- - It will look for HostCA and UserCA set in `sshd_host_ca_key` and `sshd_user_ca_key` and if the files are not there, then
-    they will be generated using `sshd_algo` algorithm.
+ - It will look for HostCA and UserCA which are set in `sshd_host_ca_key` and `sshd_user_ca_key` and if the files are not there, then
+    they will be generated using algorithm set in `sshd_algo`.
  - The host keys encrypted with `sshd_algo` algorithm will be generated and signed with HostCA if they are not already
     there.
  - The specified user keys will be generated (again - only if needed) for each of specified user (var `sshd_users`) and
@@ -33,8 +33,15 @@ The following will be done when variable `sshd_certs` set to `yes` (default):
 NOTE: For security reasons the User and Host CA fingerprint crosscheck is implemented, so if you are using your old CA
 keys, make sure you have specified the correct full path to their private keys (`sshd_host_ca_key` and `sshd_user_ca_key`)
 and their fingerprints as **SHA512** (`sshd_host_ca_key_fpr` and `sshd_user_ca_key_fpr`) hashes. You just need private
-keys. Public keys will be retrieved from the private keys of specified CA automatically if it exists.
-If there is no specific User or Host CA you want to use, then you need  the specified files will be created automatically.
+keys.
+
+Public keys will be retrieved from the private keys of specified CA automatically if that CA private key exists.
+
+NOTE: if any existing private key files are encrypted (protected by passphrase), the role will ask your to enter the
+passphrase for that private key in order to retrieve the public key. If you enter it wrong, the role will fail (and the
+handlers will not be executed). This is ansible issue which makes ansible not completely idempotend at the moment.
+
+If there is no specific User or Host CA you want to use, then the specified CA files (UserCA and HostCA) will be created automatically.
 
 To provide complete non-interactivness User and Host CA private key files will be UNENCRYPTED (no passphrase protection)
 so please back up them and store in a secure place (like [KeepassXC][keepass] db etc..). By default the files will be
@@ -127,6 +134,34 @@ Dependencies
 ------------
 
 None
+
+Role Usage
+----------
+
+###Simple PKI Setup
+ - Add
+
+
+###Certificate Setup
+
+If you want to use the existing CA keys:
+
+ - Add your HostCA and UserCA private keys to the sshd config directory on your ansible management host
+
+     By default: `sshd_config: /etc/ssh`
+
+   If you do not want to use the existing CA keys, then just skip this step. HostCA and UserCA will be generated
+   automatically during the role execution. It may ask you for passphrases, so prepare them and just Copy/Paste in order
+   the role not to fail.
+
+ - Specify the path to them in `sshd_host_ca_key`:
+
+     By default:
+
+    `sshd_host_ca_key: /etc/ssh/id_ed25519-HostCA`
+    `sshd_user_ca_key: /etc/ssh/id_ed25519-UserCA`
+
+ - Run the play!
 
 Example Playbook
 ----------------

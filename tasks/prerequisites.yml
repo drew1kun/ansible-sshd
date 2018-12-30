@@ -5,22 +5,21 @@
   delegate_to: localhost
   changed_when: false
   when: sshd_certs
+  tags: sshd
 
 - name: '[prerequisites] Make sure the ssh users exist on remote ssh server'
   user:
     name: "{{ item.username }}"
   with_items: "{{ sshd_users }}"
   become: yes
-  tags:
-    - sshd
+  tags: sshd
 
 - name: '[prerequisites] Register users home directories on remote host'
   user:
     name: "{{ item.username }}"
   register: sshd_remote_users
   with_items: "{{ sshd_users }}"
-  tags:
-    - sshd
+  tags: sshd
 
 - name: '[prerequisites] Make sure the ssh users exist on local ssh server if Certificate Setup is performed'
   user:
@@ -30,8 +29,8 @@
   delegate_to: localhost
   when: sshd_certs
   tags:
-    - sshd
-    - sshd_certs
+  - sshd
+  - sshd_certs
 
 - name: '[prerequisites] Register users home directories on local host if Certificate Setup is performed'
   user:
@@ -41,8 +40,8 @@
   delegate_to: localhost
   when: sshd_certs
   tags:
-    - sshd
-    - sshd_certs
+  - sshd
+  - sshd_certs
 
 - name: '[prerequisites] Make sure users ssh key directories exist locally if Certificate Setup is performed'
   file:
@@ -57,8 +56,8 @@
   when: sshd_certs
   no_log: yes
   tags:
-    - sshd
-    - sshd_certs
+  - sshd
+  - sshd_certs
 
 - name: '[prerequisites] Make sure users ssh key directories exist on remote host if Certificate Setup is performed'
   file:
@@ -72,6 +71,6 @@
   when: sshd_certs
   no_log: yes
   tags:
-    - sshd
-    - sshd_certs
+  - sshd
+  - sshd_certs
 ...
