@@ -37,8 +37,8 @@ PermitRootLogin no  		# No root login
 {% endif %}
 
 StrictModes yes			# Force permissions checks on keyfiles and directories
-MaxAuthTries 4			# 6 is default
-MaxSessions 4			# Must be 4 or more in order to provision multiple users with ansible
+MaxAuthTries 3			# 6 is default
+MaxSessions 5			# Must be 4 or more in order to provision multiple users with ansible
 
 PubkeyAuthentication yes 	# Use public key authentication:
 AuthorizedKeysFile      %h/.ssh/authorized_keys  # %h - home directory (may be omitted)
