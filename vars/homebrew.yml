@@ -4,4 +4,3 @@ sshd_wrapper_path: "{{ sshd_bin_path }}"
 sshd_cfg_dir: /usr/local/etc/ssh
 sshd_cfg_user: "{{ ansible_user_id }}"
 sshd_cfg_group: admin
-...

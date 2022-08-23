@@ -62,4 +62,3 @@
   become: yes
   notify: Restart sshd
   tags: sshd
-...

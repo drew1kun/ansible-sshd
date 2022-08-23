@@ -43,4 +43,3 @@ sshd_user_ca_comment: "SSH User Certificate Authority for {{ sshd_cert_id }}"
 sshd_cert_id: domain.local  # Host Identifier, used in Logging and Revoking the Certificate.
 sshd_certlogger: /usr/local/var/log/cert-signing.log
 #============================================
-...

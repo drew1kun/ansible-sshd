@@ -36,4 +36,3 @@
 - name: '[main] Include tasks for sshd setup'
   include_tasks: setup.yml
   tags: sshd
-...

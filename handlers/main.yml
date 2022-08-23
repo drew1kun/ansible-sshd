@@ -44,4 +44,3 @@
   become: yes
   listen: Restart sshd
   when: ansible_os_family == 'Darwin'
-...

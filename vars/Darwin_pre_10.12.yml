@@ -2,4 +2,3 @@
 # The system sshd config ptath was different for MacOSX pre Sierra distros
 
 sshd_cfg_dir: /etc
-...

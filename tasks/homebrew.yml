@@ -11,4 +11,3 @@
     update_homebrew: yes
   become: no
   tags: sshd
-...
